@@ -1,0 +1,49 @@
+{
+  "name": "postgresql-mcp-server",
+  "version": "1.0.0",
+  "description": "A comprehensive MCP server for PostgreSQL database interaction",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "dev": "node dist/index.js",
+    "watch": "tsx watch src/index.ts",
+    "check": "node -e \"require('./src/config.js').then(m=>console.log('✅ Configuration OK')).catch(e=>{console.error('❌ Configuration:',e.message);process.exit(1)})\"",
+    "test": "node test_complet.js",
+    "clean": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true});const files=fs.readdirSync('.').filter(f=>f.endsWith('.log'));files.forEach(f=>fs.unlinkSync(f));console.log('✅ Cleaned')\"",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "prebuild": "npm run clean",
+    "postbuild": "echo ✅ Build completed successfully",
+    "mcp:test": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "postgresql",
+    "postgres",
+    "database",
+    "sql",
+    "fastmcp",
+    "typescript",
+    "model-context-protocol"
+  ],
+  "author": "Deamon",
+  "license": "MIT",
+  "dependencies": {
+    "fastmcp": "^3.25.4",
+    "pg": "^8.11.3",
+    "zod": "^3.22.4",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.10.9",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
