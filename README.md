@@ -47,6 +47,8 @@ pnpm dev
 
 ## ⚙️ Configuration
 
+### Claude Desktop (.mcp.json)
+
 ```json
 {
   "mcpServers": {
@@ -60,6 +62,27 @@ pnpm dev
         "POSTGRES_PASSWORD": "pass",
         "POSTGRES_DATABASE": "db"
       }
+    }
+  }
+}
+```
+
+### Exemple avec chemin générique
+
+```json
+{
+  "mcpServers": {
+    "sierra-chart": {
+      "command": "node",
+      "args": [
+        "C:\\Path\\To\\SierraChart\\dist\\index.js"
+      ]
+    },
+    "postgresql": {
+      "command": "node",
+      "args": [
+        "C:\\Path\\To\\PostgreSQL\\dist\\index.js"
+      ]
     }
   }
 }
