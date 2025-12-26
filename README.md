@@ -72,17 +72,9 @@ pnpm dev
 ```json
 {
   "mcpServers": {
-    "sierra-chart": {
-      "command": "node",
-      "args": [
-        "C:\\Path\\To\\SierraChart\\dist\\index.js"
-      ]
-    },
     "postgresql": {
       "command": "node",
-      "args": [
-        "C:\\Path\\To\\PostgreSQL\\dist\\index.js"
-      ]
+      "args": ["C:\\Path\\To\\PostgreSQL\\dist\\index.js"]
     }
   }
 }
