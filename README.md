@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=JetBrains+Mono&size=30&duration=3000&color=5865F2&center=true&vCenter=true&multiline=true&height=50&lines=%20%F0%9F%90%A4%20PostgreSQL%20MCP%20Server%20;%E2%9C%A8%2026%20outils%20pour%20interagir%20avec%20PostgreSQL%20" alt="PostgreSQL MCP Server">
+  <img src="https://readme-typing-svg.herokuapp.com?font=JetBrains+Mono&size=32&duration=3500&color=5865F2&center=true&vCenter=true&multiline=true&height=140&lines=%F0%9F%90%98PostgreSQLMCPServer" alt="PostgreSQL MCP Server">
 </p>
 
 <br>
