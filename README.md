@@ -67,3 +67,12 @@ TypeScript • FastMCP • node-postgres • Zod • pnpm
 ## 📄 Licence
 
 MIT
+
+---
+
+## 🔌 Installation de pg_vector (optionnel)
+
+Pour utiliser la recherche vectorielle, installez l'extension : https://github.com/pgvector/pgvector
+
+- **Windows** : https://github.com/pgvector/pgvector/blob/master/README.md#windows
+- **Linux** : `sudo apt install postgresql-16-pgvector`
