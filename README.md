@@ -43,8 +43,6 @@ cp .env.example .env
 # Compiler le projet TypeScript
 pnpm build
 
-# Démarrer le serveur
-pnpm dev
 ```
 
 ## ⚙️ Configuration
