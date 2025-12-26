@@ -49,27 +49,7 @@ pnpm dev
 
 ## ⚙️ Configuration
 
-### Claude Desktop (.mcp.json)
-
-```json
-{
-  "mcpServers": {
-    "postgresql": {
-      "command": "node",
-      "args": ["dist/index.js"],
-      "env": {
-        "POSTGRES_HOST": "localhost",
-        "POSTGRES_PORT": "5432",
-        "POSTGRES_USER": "user",
-        "POSTGRES_PASSWORD": "pass",
-        "POSTGRES_DATABASE": "db"
-      }
-    }
-  }
-}
-```
-
-### Exemple avec chemin générique
+### .mcp.json
 
 ```json
 {
