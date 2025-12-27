@@ -25,6 +25,70 @@ export class PGVectorTools {
   }
 
   /**
+   * Formate les erreurs PostgreSQL avec diagnostics et suggestions
+   */
+  private formatError(error: any, context: string): string {
+    const msg = error.message || String(error);
+
+    // Mapping des erreurs courantes vers des solutions
+    const errorMap: Record<string, { explanation: string; suggestion: string }> = {
+      'column': {
+        explanation: 'La colonne spécifiée n\'existe pas dans la table',
+        suggestion: 'Vérifiez le nom de la colonne ou créez-la avec pgvector_create_column'
+      },
+      'relation': {
+        explanation: 'La table spécifiée n\'existe pas',
+        suggestion: 'Créez la table d\'abord avec pgvector_create_column (createTable:true)'
+      },
+      'dimension': {
+        explanation: 'Les dimensions du vecteur ne correspondent pas',
+        suggestion: 'Vérifiez que toutes les dimensions des vecteurs sont identiques'
+      },
+      'vector': {
+        explanation: 'Le format du vecteur est incorrect',
+        suggestion: 'Le vecteur doit être un tableau de nombres (ex: [0.1, 0.2, 0.3])'
+      },
+      'extension "vector" does not exist': {
+        explanation: 'L\'extension pgvector n\'est pas installée',
+        suggestion: 'Utilisez pgvector_check_extension avec autoInstall:true'
+      },
+      'value too long for type': {
+        explanation: 'Le vecteur a trop de dimensions pour la colonne',
+        suggestion: 'Vérifiez les dimensions de la colonne vectorielle'
+      }
+    };
+
+    // Chercher une correspondance
+    let matched = false;
+    let explanation = '';
+    let suggestion = '';
+
+    for (const [key, value] of Object.entries(errorMap)) {
+      if (msg.toLowerCase().includes(key)) {
+        explanation = value.explanation;
+        suggestion = value.suggestion;
+        matched = true;
+        break;
+      }
+    }
+
+    let output = `❌ **Erreur: ${context}**\n\n`;
+    output += `📝 Message: ${msg}\n`;
+
+    if (matched) {
+      output += `\n💡 **Explication:** ${explanation}\n`;
+      output += `🔧 **Suggestion:** ${suggestion}\n`;
+    } else {
+      output += `\n💡 Vérifiez:\n`;
+      output += `   - La connexion à la base de données\n`;
+      output += `   - L\'extension pgvector est installée\n`;
+      output += `   - Les noms de table/colonne sont corrects\n`;
+    }
+
+    return output;
+  }
+
+  /**
    * Enregistre tous les outils pg_vector sur le serveur MCP
    */
   registerTools(): void {
@@ -38,8 +102,11 @@ export class PGVectorTools {
     this.listVectorTables();
     this.batchInsertVectors();
     this.updateVector();
+    this.validateVectors();
+    this.normalizeVector();
+    this.diagnostic();
 
-    Logger.info('✅ Outils pg_vector enregistrés (10 outils)');
+    Logger.info('✅ Outils pg_vector enregistrés (13 outils)');
   }
 
   // ========================================================================
@@ -130,7 +197,7 @@ CREATE EXTENSION vector;
 💡 Une fois pg_vector installé sur le serveur, relancez la commande avec autoInstall:true`;
           }
 
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -227,7 +294,7 @@ CREATE EXTENSION vector;
                  `💡 Vous pouvez maintenant insérer des vecteurs avec pgvector_insert_vector`;
         } catch (error: any) {
           Logger.error('❌ [pgvector_create_column]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -245,7 +312,8 @@ CREATE EXTENSION vector;
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
         vector: z.array(z.number()).describe('Tableau de nombres représentant le vecteur'),
         schema: z.string().optional().default('public').describe('Schéma de la table'),
-        additionalValues: z.string().optional().describe('Valeurs supplémentaires (ex: content = \'mon texte\', metadata = \'{"key": "value"}\'::jsonb)'),
+        content: z.string().optional().describe('Contenu textuel associé au vecteur'),
+        metadata: z.record(z.any()).optional().describe('Métadonnées JSON associées (objet clé/valeur)'),
       }),
       execute: async (args) => {
         try {
@@ -255,24 +323,47 @@ CREATE EXTENSION vector;
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           let query = `INSERT INTO ${fullTableName} (${args.vectorColumn}`;
-          let values = `VALUES ('${vectorString}'::vector`;
+          let values: any[] = [vectorString];
+          let paramIndex = 2;
 
-          if (args.additionalValues) {
-            query += `, ${args.additionalValues.split('=')[0].trim()}`;
-            values += `, ${args.additionalValues.split('=').slice(1).join('=').trim()}`;
+          // Colonnes additionnelles
+          const columns: string[] = [];
+          const valuePlaceholders: string[] = [];
+
+          if (args.content !== undefined) {
+            columns.push('content');
+            valuePlaceholders.push(`$${paramIndex++}`);
+            values.push(args.content);
           }
 
-          query += `) ${values})`;
+          if (args.metadata !== undefined) {
+            columns.push('metadata');
+            valuePlaceholders.push(`$${paramIndex++}::jsonb`);
+            values.push(JSON.stringify(args.metadata));
+          }
 
-          await client.query(query);
+          if (columns.length > 0) {
+            query += `, ${columns.join(', ')}`;
+          }
+          query += `) VALUES ($1::vector`;
+
+          if (valuePlaceholders.length > 0) {
+            query += `, ${valuePlaceholders.join(', ')}`;
+          }
+
+          query += `)`;
+
+          await client.query(query, values);
           await client.release();
 
           Logger.info(`✅ Vecteur inséré dans ${args.tableName}`);
           return `✅ Vecteur inséré dans ${args.schema}.${args.tableName}\n` +
-                 `   Dimensions: ${args.vector.length}`;
+                 `   Dimensions: ${args.vector.length}` +
+                 (args.content ? `\n   Content: ${args.content.substring(0, 50)}...` : '') +
+                 (args.metadata ? `\n   Metadata: ${Object.keys(args.metadata).length} champs` : '');
         } catch (error: any) {
           Logger.error('❌ [pgvector_insert_vector]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -356,7 +447,7 @@ CREATE EXTENSION vector;
           return output;
         } catch (error: any) {
           Logger.error('❌ [pgvector_search]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -416,7 +507,7 @@ CREATE EXTENSION vector;
                  `💡 HNSW est recommandé pour la plupart des cas d'usage`;
         } catch (error: any) {
           Logger.error('❌ [pgvector_create_index]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -463,7 +554,7 @@ CREATE EXTENSION vector;
                  `   Restants: ${afterCount}`;
         } catch (error: any) {
           Logger.error('❌ [pgvector_delete]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -547,7 +638,7 @@ CREATE EXTENSION vector;
           return output;
         } catch (error: any) {
           Logger.error('❌ [pgvector_stats]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -599,7 +690,7 @@ CREATE EXTENSION vector;
           return output;
         } catch (error: any) {
           Logger.error('❌ [pgvector_list_tables]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -616,12 +707,11 @@ CREATE EXTENSION vector;
         tableName: z.string().describe('Nom de la table'),
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
         vectors: z.array(z.object({
-          vector: z.array(z.number()),
-          id: z.number().optional(),
-          data: z.any().optional(),
+          vector: z.array(z.number()).describe('Tableau de nombres représentant le vecteur'),
+          content: z.string().optional().describe('Contenu textuel associé'),
+          metadata: z.record(z.any()).optional().describe('Métadonnées JSON'),
         })).describe('Tableau de vecteurs avec leurs données associées'),
         schema: z.string().optional().default('public').describe('Schéma de la table'),
-        additionalColumns: z.string().optional().describe('Colonnes supplémentaires à insérer (séparées par virgule)'),
       }),
       execute: async (args) => {
         try {
@@ -629,49 +719,46 @@ CREATE EXTENSION vector;
 
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
-          // Construire la requête d'insertion
-          let query = `INSERT INTO ${fullTableName} (${args.vectorColumn}`;
-          let valuesPlaceholders: string[] = [];
-          let allValues: any[] = [];
+          // Vérifier que tous les vecteurs ont les mêmes champs optionnels
+          const hasContent = args.vectors.every(v => v.content !== undefined);
+          const hasMetadata = args.vectors.every(v => v.metadata !== undefined);
 
-          if (args.additionalColumns) {
-            const columns = args.additionalColumns.split(',').map((c: string) => c.trim());
-            columns.forEach((col: string) => {
-              query += `, ${col}`;
-            });
-          }
-          query += ') VALUES ';
+          // Colonnes de la requête (uniquement si tous ont les champs)
+          const columns = [args.vectorColumn];
+          if (hasContent) columns.push('content');
+          if (hasMetadata) columns.push('metadata');
 
-          args.vectors.forEach((item, index) => {
-            const baseIndex = index * (args.additionalColumns ? args.additionalColumns.split(',').length + 1 : 1);
-            let placeholders = `($${baseIndex + 1}::vector`;
+          // Construire VALUES et les paramètres
+          const valuesPlaceholders: string[] = [];
+          const queryParams: any[] = [];
+          let paramIndex = 1;
 
-            if (args.additionalColumns) {
-              const columns = args.additionalColumns.split(',').length;
-              for (let i = 1; i <= columns; i++) {
-                placeholders += `, $${baseIndex + 1 + i}`;
-              }
+          for (const item of args.vectors) {
+            // Ajouter le vecteur
+            const vectorStr = `[${item.vector.join(',')}]`;
+            queryParams.push(vectorStr);
+            let placeholders = `($${paramIndex++}::vector`;
+
+            // Ajouter content uniquement si tous les vecteurs l'ont
+            if (hasContent) {
+              queryParams.push(item.content!);
+              placeholders += `, $${paramIndex++}`;
             }
+
+            // Ajouter metadata uniquement si tous les vecteurs l'ont
+            if (hasMetadata) {
+              queryParams.push(JSON.stringify(item.metadata!));
+              placeholders += `, $${paramIndex++}::jsonb`;
+            }
+
             placeholders += ')';
-
             valuesPlaceholders.push(placeholders);
-            allValues.push(`[${item.vector.join(',')}]`);
+          }
 
-            // Ajouter les valeurs additionnelles
-            if (args.additionalColumns && item.data) {
-              const columns = args.additionalColumns.split(',').map((c: string) => c.trim());
-              columns.forEach((col: string) => {
-                const val = (item.data as any)[col];
-                allValues.push(val !== undefined ? val : null);
-              });
-            }
-          });
-
-          query += valuesPlaceholders.join(', ');
-          query += ' RETURNING *';
+          const query = `INSERT INTO ${fullTableName} (${columns.join(', ')}) VALUES ${valuesPlaceholders.join(', ')} RETURNING *`;
 
           const startTime = Date.now();
-          const result = await client.query(query, allValues);
+          const result = await client.query(query, queryParams);
           const duration = Date.now() - startTime;
 
           await client.release();
@@ -680,11 +767,12 @@ CREATE EXTENSION vector;
           return `✅ Insertion en lot réussie:\n` +
                  `   Table: ${args.schema}.${args.tableName}\n` +
                  `   Vecteurs insérés: ${result.rows.length}\n` +
+                 `   Colonnes: ${columns.join(', ')}\n` +
                  `   Durée: ${duration}ms\n` +
                  `   Moyenne: ${(duration / result.rows.length).toFixed(2)}ms/vecteur`;
         } catch (error: any) {
           Logger.error('❌ [pgvector_batch_insert]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Erreur');
         }
       },
     });
@@ -711,14 +799,15 @@ CREATE EXTENSION vector;
           const vectorString = `[${args.vector.join(',')}]`;
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
+          // Utiliser des paramètres pour éviter les injections
           const query = `
             UPDATE ${fullTableName}
-            SET ${args.vectorColumn} = '${vectorString}'::vector
+            SET ${args.vectorColumn} = $1::vector
             WHERE ${args.whereClause}
             RETURNING *
           `;
 
-          const result = await client.query(query);
+          const result = await client.query(query, [vectorString]);
           await client.release();
 
           if (result.rows.length === 0) {
@@ -733,7 +822,445 @@ CREATE EXTENSION vector;
                  `   Nouvelles dimensions: ${args.vector.length}`;
         } catch (error: any) {
           Logger.error('❌ [pgvector_update]', error.message);
-          return `❌ Erreur: ${error.message}`;
+          return this.formatError(error, 'Mise à jour de vecteur');
+        }
+      },
+    });
+  }
+
+  // ========================================================================
+  // 11. Valider des vecteurs avant insertion
+  // ========================================================================
+  private validateVectors(): void {
+    this.server.addTool({
+      name: 'pgvector_validate',
+      description: 'Valide un ensemble de vecteurs avant insertion (vérifie dimensions, cohérence, compatibilité table)',
+      parameters: z.object({
+        vectors: z.array(z.object({
+          vector: z.array(z.number()).describe('Tableau de nombres représentant le vecteur'),
+        })).describe('Vecteurs à valider'),
+        tableName: z.string().optional().describe('Nom de la table pour vérifier la compatibilité'),
+        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
+        schema: z.string().optional().default('public').describe('Schéma de la table'),
+        strictMode: z.boolean().optional().default(false).describe('Échoue rapidement dès la première erreur'),
+      }),
+      execute: async (args) => {
+        try {
+          const issues: string[] = [];
+          const suggestions: string[] = [];
+          let compatible = true;
+
+          // Vérifier que la liste n'est pas vide
+          if (args.vectors.length === 0) {
+            return `❌ **Validation échouée**\n\n❌ Aucun vecteur à valider`;
+          }
+
+          // Récupérer les dimensions attendues depuis la table si spécifiée
+          let expectedDimensions: number | null = null;
+          if (args.tableName) {
+            try {
+              const client = await this.pool.connect();
+              const colResult = await client.query(`
+                SELECT character_maximum_length
+                FROM information_schema.columns
+                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+              `, [args.schema, args.tableName, args.vectorColumn]);
+
+              if (colResult.rows.length > 0) {
+                expectedDimensions = parseInt(colResult.rows[0].character_maximum_length);
+              }
+              await client.release();
+            } catch (e) {
+              // Ignorer les erreurs lors de la récupération des dimensions
+            }
+          }
+
+          // Analyser les dimensions
+          const dimensionsSet = new Set<number>();
+          const nullVectors: number[] = [];
+          const nanVectors: number[] = [];
+          const infVectors: number[] = [];
+
+          args.vectors.forEach((item, index) => {
+            const vec = item.vector;
+
+            // Vérifier vecteur vide
+            if (vec.length === 0) {
+              nullVectors.push(index);
+              issues.push(`Vecteur #${index + 1}: vide`);
+              return;
+            }
+
+            dimensionsSet.add(vec.length);
+
+            // Vérifier valeurs invalides
+            vec.forEach((val, i) => {
+              if (isNaN(val)) nanVectors.push(index);
+              if (!isFinite(val)) infVectors.push(index);
+            });
+          });
+
+          // Vérifier cohérence des dimensions
+          if (dimensionsSet.size > 1) {
+            compatible = false;
+            issues.push(`⚠️ Dimensions incohérentes: ${Array.from(dimensionsSet).join(', ')}D`);
+            suggestions.push(`Tous les vecteurs doivent avoir la même dimension`);
+          }
+
+          // Vérifier NaN
+          if (nanVectors.length > 0) {
+            compatible = false;
+            issues.push(`⚠️ NaN détecté dans ${nanVectors.length} vecteur(s)`);
+            suggestions.push(`Remplacez les valeurs NaN par 0 ou une valeur par défaut`);
+          }
+
+          // Vérifier Inf
+          if (infVectors.length > 0) {
+            compatible = false;
+            issues.push(`⚠️ Infinite détecté dans ${infVectors.length} vecteur(s)`);
+            suggestions.push(`Les valeurs infinies ne sont pas supportées`);
+          }
+
+          // Vérifier vecteurs vides
+          if (nullVectors.length > 0) {
+            compatible = false;
+            issues.push(`⚠️ ${nullVectors.length} vecteur(s) vide(s)`);
+          }
+
+          // Vérifier compatibilité avec la table
+          if (expectedDimensions !== null) {
+            const actualDimensions = Array.from(dimensionsSet)[0];
+            if (actualDimensions !== expectedDimensions) {
+              compatible = false;
+              issues.push(`⚠️ Dimensions incompatibles avec la table: ${actualDimensions}D ≠ ${expectedDimensions}D attendus`);
+              suggestions.push(`Utilisez des vecteurs de ${expectedDimensions} dimensions pour la table ${args.schema}.${args.tableName}`);
+            }
+          }
+
+          // Construire le rapport
+          let output = `📋 **Rapport de Validation**\n\n`;
+          output += `📊 Vecteurs analysés: ${args.vectors.length}\n`;
+          output += `📏 Dimensions trouvées: ${Array.from(dimensionsSet).join(', ')}D\n\n`;
+
+          output += `✅ **Compatible:** ${compatible ? 'OUI' : 'NON'}\n\n`;
+
+          if (issues.length > 0) {
+            output += `❌ **Problèmes (${issues.length}):**\n`;
+            issues.forEach(issue => output += `   ${issue}\n`);
+            output += `\n`;
+          }
+
+          if (suggestions.length > 0) {
+            output += `💡 **Suggestions:**\n`;
+            suggestions.forEach(sug => output += `   • ${sug}\n`);
+            output += `\n`;
+          }
+
+          if (compatible) {
+            output += `🎉 **Tous les vecteurs sont valides !**\n\n`;
+            if (args.tableName) {
+              output += `📌 Prêt pour l'insertion dans ${args.schema}.${args.tableName}\n`;
+            }
+          } else if (args.strictMode) {
+            output += `\n🚫 **Mode strict: Validation échouée**`;
+          } else {
+            output += `\n⚠️ Corrigez les problèmes avant insertion`;
+          }
+
+          return output;
+        } catch (error: any) {
+          Logger.error('❌ [pgvector_validate]', error.message);
+          return this.formatError(error, 'Validation de vecteurs');
+        }
+      },
+    });
+  }
+
+  // ========================================================================
+  // 12. Normaliser un vecteur
+  // ========================================================================
+  private normalizeVector(): void {
+    this.server.addTool({
+      name: 'pgvector_normalize',
+      description: 'Normalise un vecteur pour améliorer les recherches de similarité',
+      parameters: z.object({
+        vector: z.array(z.number()).describe('Vecteur à normaliser'),
+        method: z.enum(['l2', 'max', 'minmax', 'sum']).optional().default('l2').describe('Méthode de normalisation: l2 (euclidienne), max (max value), minmax (0-1), sum (sum=1)'),
+        decimals: z.number().optional().default(6).describe('Nombre de décimales à conserver'),
+      }),
+      execute: async (args) => {
+        try {
+          const vec = [...args.vector];
+          const n = vec.length;
+          let result: number[];
+
+          switch (args.method) {
+            case 'l2': {
+              // Normalisation L2 (euclidienne)
+              const sumSquares = vec.reduce((sum, val) => sum + val * val, 0);
+              const norm = Math.sqrt(sumSquares);
+              if (norm === 0) {
+                return `❌ **Erreur: Impossible de normaliser**\n\nLa norme L2 est 0 (vecteur nul)`;
+              }
+              result = vec.map(val => val / norm);
+              break;
+            }
+            case 'max': {
+              // Normalisation par max
+              const maxVal = Math.max(...vec.map(Math.abs));
+              if (maxVal === 0) {
+                return `❌ **Erreur: Impossible de normaliser**\n\nLe maximum est 0 (vecteur nul)`;
+              }
+              result = vec.map(val => val / maxVal);
+              break;
+            }
+            case 'minmax': {
+              // Normalisation MinMax [0,1]
+              const minVal = Math.min(...vec);
+              const maxVal = Math.max(...vec);
+              const range = maxVal - minVal;
+              if (range === 0) {
+                return `❌ **Erreur: Impossible de normaliser**\n\nLe range est 0 (toutes les valeurs identiques)`;
+              }
+              result = vec.map(val => (val - minVal) / range);
+              break;
+            }
+            case 'sum': {
+              // Normalisation par somme (sum = 1)
+              const sum = vec.reduce((s, val) => s + Math.abs(val), 0);
+              if (sum === 0) {
+                return `❌ **Erreur: Impossible de normaliser**\n\nLa somme est 0 (vecteur nul)`;
+              }
+              result = vec.map(val => val / sum);
+              break;
+            }
+            default:
+              result = vec;
+          }
+
+          // Arrondir
+          result = result.map(val => {
+            const rounded = parseFloat(val.toFixed(args.decimals));
+            return rounded;
+          });
+
+          // Vérifier la nouvelle norme
+          const newNorm = Math.sqrt(result.reduce((sum, val) => sum + val * val, 0));
+
+          let output = `✅ **Vecteur Normalisé**\n\n`;
+          output += `📊 Méthode: ${args.method.toUpperCase()}\n`;
+          output += `📏 Dimensions: ${n}\n`;
+          output += `🎯 Nouvelle norme: ${newNorm.toFixed(6)}\n\n`;
+
+          output += `**Vecteur normalisé:**\n`;
+          output += `[${result.slice(0, 10).join(', ')}${n > 10 ? ', ...' : ''}]\n\n`;
+
+          output += `📋 **JSON pour insertion:**\n`;
+          output += `\`\`\`json\n${JSON.stringify(result)}\n\`\`\`\n\n`;
+
+          output += `💡 Utilisez ce vecteur avec pgvector_insert_vector ou pgvector_batch_insert`;
+
+          return output;
+        } catch (error: any) {
+          Logger.error('❌ [pgvector_normalize]', error.message);
+          return this.formatError(error, 'Normalisation de vecteur');
+        }
+      },
+    });
+  }
+
+  // ========================================================================
+  // 13. Diagnostic complet d'une table vectorielle
+  // ========================================================================
+  private diagnostic(): void {
+    this.server.addTool({
+      name: 'pgvector_diagnostic',
+      description: 'Effectue un diagnostic complet d\'une table vectorielle avec suggestions de correction',
+      parameters: z.object({
+        tableName: z.string().describe('Nom de la table à diagnostiquer'),
+        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
+        schema: z.string().optional().default('public').describe('Schéma de la table'),
+        generateFixScript: z.boolean().optional().default(false).describe('Générer un script SQL de correction'),
+      }),
+      execute: async (args) => {
+        try {
+          const client = await this.pool.connect();
+          const fullTableName = `"${args.schema}"."${args.tableName}"`;
+          const issues: string[] = [];
+          const suggestions: string[] = [];
+          const fixScripts: string[] = [];
+
+          let output = `🔍 **Diagnostic: ${args.schema}.${args.tableName}**\n\n`;
+
+          // 1. Vérifier que la table existe
+          const tableCheck = await client.query(`
+            SELECT EXISTS(
+              SELECT 1 FROM information_schema.tables
+              WHERE table_schema = $1 AND table_name = $2
+            ) as exists
+          `, [args.schema, args.tableName]);
+
+          if (!tableCheck.rows[0].exists) {
+            await client.release();
+            output += `❌ **Table non trouvée**\n\n`;
+            output += `💡 **Suggestion:**\n`;
+            output += `   Créez la table avec pgvector_create_column:\n`;
+            output += `   \`\`\`\n`;
+            output += `   tableName: "${args.tableName}"\n`;
+            output += `   dimensions: 1536  # ou vos dimensions\n`;
+            output += `   createTable: true\n`;
+            output += `   \`\`\`\n`;
+            return output;
+          }
+
+          output += `✅ Table existe\n\n`;
+
+          // 2. Vérifier la colonne vectorielle
+          const colCheck = await client.query(`
+            SELECT
+              data_type,
+              udt_name,
+              character_maximum_length,
+              is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+          `, [args.schema, args.tableName, args.vectorColumn]);
+
+          if (colCheck.rows.length === 0) {
+            issues.push(`Colonne vectorielle "${args.vectorColumn}" non trouvée`);
+            suggestions.push(`Créez la colonne avec pgvector_create_column`);
+            fixScripts.push(`ALTER TABLE ${fullTableName} ADD COLUMN ${args.vectorColumn} vector(1536);`);
+          } else {
+            const colInfo = colCheck.rows[0];
+            output += `✅ Colonne vectorielle: ${colInfo.udt_name}(${colInfo.character_maximum_length}D)\n`;
+            output += `   Nullable: ${colInfo.is_nullable}\n\n`;
+
+            // Vérifier les dimensions standards
+            const dims = parseInt(colInfo.character_maximum_length);
+            const standardModels: Record<number, string> = {
+              1536: 'OpenAI text-embedding-ada-002',
+              3072: 'OpenAI text-embedding-3-large',
+              768: 'Sentence Transformers (bert-base)',
+              384: 'Sentence Transformers (all-MiniLM-L6-v2)'
+            };
+            if (standardModels[dims]) {
+              output += `💡 Correspond probablement à: ${standardModels[dims]}\n\n`;
+            }
+          }
+
+          // 3. Vérifier les colonnes support (content, metadata)
+          const supportColumns = await client.query(`
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = $1 AND table_name = $2
+              AND column_name IN ('content', 'metadata', 'id')
+            ORDER BY column_name
+          `, [args.schema, args.tableName]);
+
+          if (supportColumns.rows.length > 0) {
+            output += `📋 Colonnes support trouvées:\n`;
+            supportColumns.rows.forEach((col: any) => {
+              output += `   • ${col.column_name}: ${col.data_type}\n`;
+            });
+            output += `\n`;
+          } else {
+            output += `⚠️ Aucune colonne support (content, metadata, id)\n\n`;
+          }
+
+          // 4. Compter les vecteurs
+          const countResult = await client.query(`
+            SELECT
+              COUNT(*) as total,
+              COUNT(${args.vectorColumn}) as with_vector,
+              COUNT(*) - COUNT(${args.vectorColumn}) as null_vectors
+            FROM ${fullTableName}
+          `);
+
+          const stats = countResult.rows[0];
+          output += `📊 **Statistiques:**\n`;
+          output += `   Total lignes: ${stats.total}\n`;
+          output += `   Avec vecteur: ${stats.with_vector}\n`;
+          if (parseInt(stats.null_vectors) > 0) {
+            output += `   ⚠️ Vecteurs NULL: ${stats.null_vectors}\n`;
+            issues.push(`${stats.null_vectors} vecteurs NULL détectés`);
+          }
+          output += `\n`;
+
+          // 5. Vérifier les index
+          const indexCheck = await client.query(`
+            SELECT
+              indexname,
+              indexdef
+            FROM pg_indexes
+            WHERE schemaname = $1 AND tablename = $2
+              AND indexdef LIKE '%${args.vectorColumn}%'
+          `, [args.schema, args.tableName]);
+
+          if (indexCheck.rows.length === 0) {
+            output += `⚠️ **Aucun index vectoriel**\n`;
+            output += `   ⚠️ Les recherches seront lentes sans index\n\n`;
+            issues.push(`Aucun index vectoriel`);
+            suggestions.push(`Créez un index HNSW pour des recherches rapides`);
+            fixScripts.push(`CREATE INDEX ${args.tableName}_${args.vectorColumn}_hnsw_idx ON ${fullTableName} USING hnsw (${args.vectorColumn} vector_cosine_ops);`);
+          } else {
+            output += `✅ **Index vectoriels (${indexCheck.rows.length}):**\n`;
+            indexCheck.rows.forEach((idx: any) => {
+              output += `   • ${idx.indexname}\n`;
+              // Extraire le type d'index
+              if (idx.indexdef.includes('hnsw')) {
+                output += `     Type: HNSW (rapide)\n`;
+              } else if (idx.indexdef.includes('ivfflat')) {
+                output += `     Type: IVFFlat (compact)\n`;
+              }
+            });
+            output += `\n`;
+          }
+
+          // 6. Vérifier l'extension pgvector
+          const extCheck = await client.query(`
+            SELECT EXISTS(
+              SELECT 1 FROM pg_extension WHERE extname = 'vector'
+            ) as installed
+          `);
+
+          if (!extCheck.rows[0].installed) {
+            issues.push(`Extension pgvector non installée`);
+            suggestions.push(`Installez l'extension: CREATE EXTENSION vector;`);
+          }
+
+          await client.release();
+
+          // Résumé
+          output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+          output += `📋 **Résumé:**\n`;
+
+          if (issues.length === 0) {
+            output += `\n🎉 **Aucun problème détecté !**\n`;
+            output += `La table ${args.schema}.${args.tableName} est prête à l'emploi.\n`;
+          } else {
+            output += `\n⚠️ **${issues.length} problème(s) détecté(s)**\n\n`;
+            output += `**Problèmes:**\n`;
+            issues.forEach(issue => output += `   ❌ ${issue}\n`);
+            output += `\n`;
+
+            if (suggestions.length > 0) {
+              output += `**Suggestions:**\n`;
+              suggestions.forEach(sug => output += `   💡 ${sug}\n`);
+            }
+
+            // Script de correction
+            if (args.generateFixScript && fixScripts.length > 0) {
+              output += `\n🔧 **Script de correction SQL:**\n`;
+              output += `\`\`\`sql\n`;
+              fixScripts.forEach(script => output += script + '\n');
+              output += `\`\`\`\n`;
+            }
+          }
+
+          return output;
+        } catch (error: any) {
+          Logger.error('❌ [pgvector_diagnostic]', error.message);
+          return this.formatError(error, 'Diagnostic');
         }
       },
     });

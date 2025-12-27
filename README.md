@@ -54,7 +54,7 @@ pnpm build
   "mcpServers": {
     "postgresql": {
       "command": "node",
-      "args": ["C:\\Path\\To\\PostgreSQL\\dist\\index.js"]
+      "args": ["C:\\Path\\To\\PostgreSQL-MCP-Serveur\\dist\\index.js"]
     }
   }
 }
@@ -70,9 +70,16 @@ MIT
 
 ---
 
-## 🔌 Installation de pg_vector (optionnel)
+## 🔌 Installation de pg_vector
 
-Pour utiliser la recherche vectorielle, installez l'extension : https://github.com/pgvector/pgvector
+Pour utiliser la recherche vectorielle, installez l'extension pgvector
+avec docker sur Windows
 
-- **Windows** : https://github.com/pgvector/pgvector/blob/master/README.md#windows
+**Windows**
+
+```bash
+# Utiliser l'image officielle avec pgvector préinstallé
+docker pull pgvector/pgvector:pg16
+```
+
 - **Linux** : `sudo apt install postgresql-16-pgvector`
