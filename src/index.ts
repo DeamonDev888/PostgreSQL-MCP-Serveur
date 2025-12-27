@@ -110,6 +110,120 @@ server.addTool({
   },
 });
 
+// 1.5. Diagnostic complet PostgreSQL
+server.addTool({
+  name: 'postgres_diagnose',
+  description: "Diagnostic complet : vérifie Docker, PostgreSQL, base de données et fournit des solutions",
+  parameters: z.object({
+    checkDocker: z.boolean().optional().describe("Vérifier si Docker est en cours d'exécution").default(true),
+    checkPg: z.boolean().optional().describe("Vérifier si PostgreSQL est accessible").default(true),
+  }),
+  execute: async (args) => {
+    const diagnostics: string[] = [];
+    let allGood = true;
+
+    // 1. Vérification de Docker
+    if (args.checkDocker) {
+      diagnostics.push('🔍 **Diagnostic Docker :**');
+      try {
+        const dockerCheck = await import('child_process').then(({ execSync }) => {
+          try {
+            execSync('docker --version', { stdio: 'ignore' });
+            return '✅ Docker est installé';
+          } catch {
+            return '❌ Docker n\'est pas installé ou pas dans le PATH';
+          }
+        });
+        diagnostics.push(dockerCheck);
+
+        // Vérifier si le conteneur PostgreSQL est en cours d'exécution
+        try {
+          const containerCheck = await import('child_process').then(({ execSync }) => {
+            try {
+              const output = execSync('docker ps --filter name=postgres --format "{{.Names}}"', { encoding: 'utf8' });
+              if (output.trim()) {
+                return `✅ Conteneur PostgreSQL détecté : ${output.trim()}`;
+              } else {
+                return '⚠️  Aucun conteneur PostgreSQL en cours d\'exécution';
+              }
+            } catch {
+              return '⚠️  Impossible de vérifier les conteneurs Docker';
+            }
+          });
+          diagnostics.push(containerCheck);
+        } catch {
+          // Ignore errors for container check
+        }
+      } catch {
+        diagnostics.push('❌ Impossible de vérifier Docker');
+      }
+    }
+
+    // 2. Vérification de PostgreSQL
+    if (args.checkPg) {
+      diagnostics.push('\n🔍 **Diagnostic PostgreSQL :**');
+      diagnostics.push(`📍 Configuration :`);
+      diagnostics.push(`   - Hôte : ${dbConfig.POSTGRES_HOST}:${dbConfig.POSTGRES_PORT}`);
+      diagnostics.push(`   - Base : ${dbConfig.POSTGRES_DATABASE}`);
+      diagnostics.push(`   - Utilisateur : ${dbConfig.POSTGRES_USER}`);
+
+      // Test de connexion
+      try {
+        const testPool = getPool();
+        const client = await testPool.connect();
+        const result = await client.query('SELECT version() as version, current_database() as database');
+
+        diagnostics.push('\n✅ **Connexion PostgreSQL : RÉUSSIE**');
+        diagnostics.push(`   - Version : ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`);
+        diagnostics.push(`   - Base active : ${result.rows[0].database}`);
+        diagnostics.push(`   - Statut : Opérationnel`);
+
+        await client.release();
+        allGood = allGood && true;
+      } catch (error: any) {
+        diagnostics.push('\n❌ **Connexion PostgreSQL : ÉCHEC**');
+        diagnostics.push(`   - Erreur : ${error.message}`);
+
+        if (error.code === 'ECONNREFUSED') {
+          diagnostics.push('\n🔧 **Solutions possibles :**');
+          diagnostics.push('   1. Démarrer PostgreSQL :');
+          diagnostics.push('      - Via Docker Desktop :');
+          diagnostics.push('        • Lancez Docker Desktop manuellement');
+          diagnostics.push('        • Attendez que l\'icône indique "Running"');
+          diagnostics.push('        • Créez un conteneur PostgreSQL');
+          diagnostics.push('      - Via service local : sudo systemctl start postgresql');
+          diagnostics.push('   2. Vérifier la configuration :');
+          diagnostics.push(`      - Hôte actuel : ${dbConfig.POSTGRES_HOST}:${dbConfig.POSTGRES_PORT}`);
+          diagnostics.push('      - Modifier .env si nécessaire');
+        } else if (error.code === '28P01') {
+          diagnostics.push('\n🔧 **Solutions possibles :**');
+          diagnostics.push('   - Vérifier le nom d\'utilisateur et le mot de passe dans .env');
+          diagnostics.push('   - Créer l\'utilisateur si nécessaire');
+        } else if (error.code === '3D000') {
+          diagnostics.push('\n🔧 **Solutions possibles :**');
+          diagnostics.push('   - Créer la base de données :');
+          diagnostics.push(`      - CREATE DATABASE ${dbConfig.POSTGRES_DATABASE};`);
+        }
+
+        allGood = false;
+      }
+    }
+
+    diagnostics.push('\n' + '='.repeat(50));
+    if (allGood) {
+      diagnostics.push('✅ **Diagnostic global : TOUT EST OK**');
+    } else {
+      diagnostics.push('⚠️  **Diagnostic global : PROBLÈMES DÉTECTÉS**');
+      diagnostics.push('\n💡 **Actions recommandées :**');
+      diagnostics.push('   1. Démarrez Docker Desktop manuellement');
+      diagnostics.push('   2. Ou configurez PostgreSQL local');
+      diagnostics.push('   3. Vérifiez votre configuration dans .env');
+    }
+
+    return diagnostics.join('\n');
+  },
+});
+
 // 2. Lister les bases de données
 server.addTool({
   name: 'list_databases',

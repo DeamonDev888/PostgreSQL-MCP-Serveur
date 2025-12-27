@@ -25,13 +25,96 @@ export class PGVectorTools {
   }
 
   /**
+   * Guide des modèles d'embedding standards avec leurs dimensions
+   */
+  private static readonly EMBEDDING_MODELS_GUIDE: Record<number, { model: string; provider: string; description: string }> = {
+    1536: {
+      model: 'text-embedding-ada-002',
+      provider: 'OpenAI',
+      description: 'Modèle standard OpenAI, excellent rapport qualité/coût'
+    },
+    3072: {
+      model: 'text-embedding-3-large',
+      provider: 'OpenAI',
+      description: 'Modèle haute précision OpenAI (2024+)'
+    },
+    1024: {
+      model: 'text-embedding-3-small',
+      provider: 'OpenAI',
+      description: 'Modèle léger et rapide OpenAI (2024+)'
+    },
+    768: {
+      model: 'bert-base-uncased / all-mpnet-base-v2',
+      provider: 'HuggingFace / Sentence Transformers',
+      description: 'Modèle open-source performant'
+    },
+    384: {
+      model: 'all-MiniLM-L6-v2',
+      provider: 'Sentence Transformers',
+      description: 'Modèle léger, idéal pour le local'
+    },
+    4096: {
+      model: 'embed-english-v3.0',
+      provider: 'Cohere',
+      description: 'Modèle multilingue haute performance'
+    },
+    256: {
+      model: 'nomic-embed-text-v1',
+      provider: 'Nomic AI',
+      description: 'Modèle open-source compact'
+    }
+  };
+
+  /**
+   * Génère le guide des modèles d'embedding pour l'aide LLM
+   */
+  private getEmbeddingModelsGuide(): string {
+    let guide = `\n📚 **Guide des Modèles d'Embedding Standards**\n\n`;
+    guide += `| Dimensions | Modèle | Provider | Description |\n`;
+    guide += `|------------|--------|----------|-------------|\n`;
+
+    const sortedDims = Object.keys(PGVectorTools.EMBEDDING_MODELS_GUIDE)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    for (const dim of sortedDims) {
+      const info = PGVectorTools.EMBEDDING_MODELS_GUIDE[dim];
+      guide += `| **${dim}** | ${info.model} | ${info.provider} | ${info.description} |\n`;
+    }
+
+    guide += `\n💡 **Recommandation:** Pour la production, utilisez **1536** (OpenAI ada-002) ou **384** (MiniLM local)\n`;
+    return guide;
+  }
+
+  /**
+   * Extrait les dimensions depuis un message d'erreur
+   */
+  private extractDimensionsFromError(msg: string): { expected?: number; actual?: number } {
+    // Pattern: "expected X dimensions, not Y" ou "expected X, got Y"
+    const patterns = [
+      /expected\s+(\d+)\s+dimensions?,\s+(?:not|got)\s+(\d+)/i,
+      /(\d+)\s+dimensions?\s+expected.*?(\d+)\s+(?:provided|given|got)/i,
+      /vector\((\d+)\).*?(\d+)\s+(?:dimensions?|values?)/i
+    ];
+
+    for (const pattern of patterns) {
+      const match = msg.match(pattern);
+      if (match) {
+        return { expected: parseInt(match[1]), actual: parseInt(match[2]) };
+      }
+    }
+    return {};
+  }
+
+  /**
    * Formate les erreurs PostgreSQL avec diagnostics et suggestions
    */
   private formatError(error: any, context: string): string {
     const msg = error.message || String(error);
+    const msgLower = msg.toLowerCase();
 
     // Mapping des erreurs courantes vers des solutions
-    const errorMap: Record<string, { explanation: string; suggestion: string }> = {
+    const errorMap: Record<string, { explanation: string; suggestion: string; showGuide?: boolean }> = {
       'column': {
         explanation: 'La colonne spécifiée n\'existe pas dans la table',
         suggestion: 'Vérifiez le nom de la colonne ou créez-la avec pgvector_create_column'
@@ -41,8 +124,14 @@ export class PGVectorTools {
         suggestion: 'Créez la table d\'abord avec pgvector_create_column (createTable:true)'
       },
       'dimension': {
-        explanation: 'Les dimensions du vecteur ne correspondent pas',
-        suggestion: 'Vérifiez que toutes les dimensions des vecteurs sont identiques'
+        explanation: 'Les dimensions du vecteur ne correspondent pas à la colonne',
+        suggestion: 'Assurez-vous que votre modèle d\'embedding génère le bon nombre de dimensions',
+        showGuide: true
+      },
+      'expected': {
+        explanation: 'Incompatibilité de dimensions entre le vecteur et la colonne',
+        suggestion: 'Le vecteur envoyé n\'a pas le même nombre de dimensions que la colonne',
+        showGuide: true
       },
       'vector': {
         explanation: 'Le format du vecteur est incorrect',
@@ -54,7 +143,8 @@ export class PGVectorTools {
       },
       'value too long for type': {
         explanation: 'Le vecteur a trop de dimensions pour la colonne',
-        suggestion: 'Vérifiez les dimensions de la colonne vectorielle'
+        suggestion: 'Vérifiez les dimensions de la colonne vectorielle',
+        showGuide: true
       }
     };
 
@@ -62,11 +152,13 @@ export class PGVectorTools {
     let matched = false;
     let explanation = '';
     let suggestion = '';
+    let showGuide = false;
 
     for (const [key, value] of Object.entries(errorMap)) {
-      if (msg.toLowerCase().includes(key)) {
+      if (msgLower.includes(key)) {
         explanation = value.explanation;
         suggestion = value.suggestion;
+        showGuide = value.showGuide || false;
         matched = true;
         break;
       }
@@ -78,6 +170,38 @@ export class PGVectorTools {
     if (matched) {
       output += `\n💡 **Explication:** ${explanation}\n`;
       output += `🔧 **Suggestion:** ${suggestion}\n`;
+
+      // Si c'est une erreur de dimensions, extraire les infos et afficher le guide
+      if (showGuide) {
+        const dims = this.extractDimensionsFromError(msg);
+
+        if (dims.expected || dims.actual) {
+          output += `\n📐 **Analyse des dimensions:**\n`;
+          if (dims.expected) {
+            output += `   • Attendu par la table: **${dims.expected}** dimensions\n`;
+            const expectedModel = PGVectorTools.EMBEDDING_MODELS_GUIDE[dims.expected];
+            if (expectedModel) {
+              output += `     → Compatible avec: ${expectedModel.model} (${expectedModel.provider})\n`;
+            }
+          }
+          if (dims.actual) {
+            output += `   • Reçu dans le vecteur: **${dims.actual}** dimensions\n`;
+            const actualModel = PGVectorTools.EMBEDDING_MODELS_GUIDE[dims.actual];
+            if (actualModel) {
+              output += `     → Correspond à: ${actualModel.model} (${actualModel.provider})\n`;
+            } else {
+              output += `     → ⚠️ Dimension non-standard (vecteur de test ?)\n`;
+            }
+          }
+        }
+
+        output += `\n🔧 **Solutions possibles:**\n`;
+        output += `   1. Modifier la colonne: \`ALTER TABLE <table> ALTER COLUMN embedding TYPE vector(<N>);\`\n`;
+        output += `   2. Utiliser un modèle d'embedding compatible avec les dimensions de la table\n`;
+        output += `   3. Recréer la table avec les bonnes dimensions via pgvector_create_column\n`;
+
+        output += this.getEmbeddingModelsGuide();
+      }
     } else {
       output += `\n💡 Vérifiez:\n`;
       output += `   - La connexion à la base de données\n`;
