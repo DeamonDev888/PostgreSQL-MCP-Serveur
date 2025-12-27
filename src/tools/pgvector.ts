@@ -105,8 +105,9 @@ export class PGVectorTools {
     this.validateVectors();
     this.normalizeVector();
     this.diagnostic();
+    this.analyzeSlowQueries();
 
-    Logger.info('✅ Outils pg_vector enregistrés (13 outils)');
+    Logger.info('✅ Outils pg_vector enregistrés (14 outils)');
   }
 
   // ========================================================================
@@ -929,18 +930,31 @@ CREATE EXTENSION vector;
 
           // Vérifier compatibilité avec la table
           if (expectedDimensions !== null) {
-            const actualDimensions = Array.from(dimensionsSet)[0];
-            if (actualDimensions !== expectedDimensions) {
+            const dimensionsArray = Array.from(dimensionsSet);
+            if (dimensionsArray.length > 0) {
+              const actualDimensions = dimensionsArray[0];
+              if (actualDimensions !== expectedDimensions) {
+                compatible = false;
+                issues.push(`⚠️ Dimensions incompatibles avec la table: ${actualDimensions}D ≠ ${expectedDimensions}D attendus`);
+                suggestions.push(`Utilisez des vecteurs de ${expectedDimensions} dimensions pour la table ${args.schema}.${args.tableName}`);
+              }
+            } else {
+              // Aucune dimension valide trouvée (vecteurs vides)
               compatible = false;
-              issues.push(`⚠️ Dimensions incompatibles avec la table: ${actualDimensions}D ≠ ${expectedDimensions}D attendus`);
-              suggestions.push(`Utilisez des vecteurs de ${expectedDimensions} dimensions pour la table ${args.schema}.${args.tableName}`);
+              issues.push(`Impossible de déterminer les dimensions (vecteurs vides ou invalides)`);
             }
           }
 
           // Construire le rapport
           let output = `📋 **Rapport de Validation**\n\n`;
           output += `📊 Vecteurs analysés: ${args.vectors.length}\n`;
-          output += `📏 Dimensions trouvées: ${Array.from(dimensionsSet).join(', ')}D\n\n`;
+
+          const dimensionsArray = Array.from(dimensionsSet);
+          if (dimensionsArray.length > 0) {
+            output += `📏 Dimensions trouvées: ${dimensionsArray.join(', ')}D\n\n`;
+          } else {
+            output += `📏 Dimensions trouvées: Aucune (vecteurs vides)\n\n`;
+          }
 
           output += `✅ **Compatible:** ${compatible ? 'OUI' : 'NON'}\n\n`;
 
@@ -1261,6 +1275,157 @@ CREATE EXTENSION vector;
         } catch (error: any) {
           Logger.error('❌ [pgvector_diagnostic]', error.message);
           return this.formatError(error, 'Diagnostic');
+        }
+      },
+    });
+  }
+
+  // ========================================================================
+  // 14. Analyser les requêtes lentes
+  // ========================================================================
+  private analyzeSlowQueries(): void {
+    this.server.addTool({
+      name: 'analyze_slow_queries',
+      description: 'Analyse les requêtes lentes en utilisant pg_stat_statements (nécessite l\'extension)',
+      parameters: z.object({
+        limit: z.number().optional().default(20).describe('Nombre de requêtes à afficher'),
+        minExecutions: z.number().optional().default(5).describe('Nombre minimum d\'exécutions pour être inclus'),
+        orderBy: z.enum(['total_time', 'mean_time', 'calls']).optional().default('total_time').describe('Tri par: total_time, mean_time, ou calls'),
+        includeQuery: z.boolean().optional().default(false).describe('Inclure le texte complet des requêtes (peut être long)'),
+      }),
+      execute: async (args) => {
+        try {
+          const client = await this.pool.connect();
+
+          // Vérifier si pg_stat_statements est installé
+          const extCheck = await client.query(`
+            SELECT EXISTS(
+              SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'
+            ) as installed
+          `);
+
+          if (!extCheck.rows[0].installed) {
+            await client.release();
+            return `❌ **Extension pg_stat_statements non installée**
+
+Cette extension est requise pour analyser les requêtes lentes.
+
+📦 **Installation:**
+
+\`\`\`sql
+-- Activer l'extension (nécessite les droits superuser)
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- Vérifier
+SELECT * FROM pg_extension WHERE extname = 'pg_stat_statements';
+\`\`\`
+
+⚙️ **Configuration requise dans postgresql.conf:**
+
+\`\`\`
+# Ajouter ou modifier dans postgresql.conf
+shared_preload_libraries = 'pg_stat_statements'
+
+# Puis redémarrer PostgreSQL
+\`\`\`
+
+💡 **Pourquoi pg_stat_statements?**
+- Track les performances de toutes les requêtes SQL
+- Identifie les requêtes lentes et fréquemment exécutées
+- Aide à optimiser les index et les requêtes`;
+          }
+
+          // Vérifier que pg_stat_statements est configuré
+          const statsCheck = await client.query(`
+            SELECT EXISTS(
+              SELECT 1 FROM information_schema.tables
+              WHERE table_name = 'pg_stat_statements'
+            ) as exists
+          `);
+
+          if (!statsCheck.rows[0].exists) {
+            await client.release();
+            return `⚠️ **pg_stat_statements installé mais non fonctionnel**
+
+L'extension est installée mais la vue pg_stat_statements n'est pas accessible.
+
+🔧 **Solutions possibles:**
+1. Vérifiez que shared_preload_libraries inclut pg_stat_statements
+2. Redémarrez PostgreSQL
+3. Vérifiez les permissions de l'utilisateur
+
+\`\`\`sql
+-- Vérifier la configuration
+SHOW shared_preload_libraries;
+\`\`\``;
+          }
+
+          // Récupérer les statistiques
+          const orderByMap: Record<string, string> = {
+            total_time: 'total_exec_time DESC',
+            mean_time: 'mean_exec_time DESC',
+            calls: 'calls DESC'
+          };
+
+          const query = `
+            SELECT
+              query,
+              calls,
+              total_exec_time as total_time,
+              mean_exec_time as mean_time,
+              max_exec_time as max_time,
+              stddev_exec_time as stddev_time,
+              rows
+            FROM pg_stat_statements
+            WHERE calls >= $1
+            ORDER BY ${orderByMap[args.orderBy]}
+            LIMIT $2
+          `;
+
+          const result = await client.query(query, [args.minExecutions, args.limit]);
+          await client.release();
+
+          if (result.rows.length === 0) {
+            return `📊 **Analyse des Requêtes Lentes**
+
+Aucune requête trouvée avec au moins ${args.minExecutions} exécutions.
+
+💡 Essayez de réduire le paramètre minExecutions.`;
+          }
+
+          let output = `📊 **Requêtes Lentes (${result.rows.length} résultats)**\n\n`;
+          output += `📈 Trié par: ${args.orderBy}\n`;
+          output += `🔢 Min exécutions: ${args.minExecutions}\n\n`;
+
+          result.rows.forEach((row: any, index: number) => {
+            const totalTime = (row.total_time || 0).toFixed(2);
+            const meanTime = (row.mean_time || 0).toFixed(4);
+            const maxTime = (row.max_time || 0).toFixed(4);
+            const calls = row.calls || 0;
+
+            output += `**${index + 1}.** ⏱️ Total: ${totalTime}s | Moy: ${meanTime}s | Max: ${maxTime}s | Appels: ${calls}\n`;
+
+            if (args.includeQuery && row.query) {
+              let query = row.query;
+              if (query.length > 200) {
+                query = query.substring(0, 200) + '...';
+              }
+              output += `   \`\`\`sql\n   ${query}\n   \`\`\`\n`;
+            }
+            output += `\n`;
+          });
+
+          // Suggestions d'optimisation
+          output += `💡 **Suggestions d'optimisation:**\n`;
+          output += `   • Créez des index sur les colonnes fréquemment filtrées\n`;
+          output += `   • Utilisez EXPLAIN ANALYZE pour analyser les requêtes lentes\n`;
+          output += `   • Évitez SELECT * dans les requêtes fréquentes\n`;
+          output += `   • Utilisez pgvector_create_index pour les recherches vectorielles\n`;
+
+          return output;
+        } catch (error: any) {
+          Logger.error('❌ [analyze_slow_queries]', error.message);
+          return this.formatError(error, 'Analyse des requêtes lentes');
         }
       },
     });
