@@ -240,16 +240,16 @@ export class CoreTools {
           // Validation automatique en mode readonly
           if (args.readonly) {
             const queryTrimmed = args.sql.trim();
-            const queryStart = queryTrimmed.toUpperCase().split(/\s+/)[0];
+            const queryUpper = queryTrimmed.toUpperCase();
 
-            // Mots-clés dangereux au début de la requête
-            const dangerousKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE', 'VACUUM', 'REINDEX'];
+            // Utilisation de regex au niveau des mots pour éviter les faux positifs
+            // \b确保 nous détectons les mots entiers (ex: "CREATE" dans "created_at" ne sera pas détecté)
+            const hasDangerousKeyword = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REINDEX)\b/.test(queryUpper);
 
-            // Vérifier si la requête commence par un mot-clé dangereux
-            if (dangerousKeywords.includes(queryStart)) {
+            if (hasDangerousKeyword) {
               return `❌ **Requête bloquée en mode lecture seule**
 
-⚠️ Mot-clé interdit détecté: ${queryStart}
+⚠️ Mot-clé interdit détecté dans la requête
 
 💡 **Solutions:**
 1. Utilisez readonly: false pour autoriser les modifications
@@ -257,18 +257,17 @@ export class CoreTools {
 3. Ou utilisez 'manage_vectors' pour les opérations vectorielles`;
             }
 
-            // Fonctions SQL autorisées (même en mode readonly)
-            const allowedFunctions = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT', 'GROUP_CONCAT', 'STRING_AGG'];
-            const hasAllowedFunction = allowedFunctions.some(f => queryTrimmed.toUpperCase().includes(f));
+            // Vérifier que la requête commence par un mot-clé sûr
+            const queryStart = queryTrimmed.split(/\s+/)[0].toUpperCase();
 
-            // Vérifier que c'est bien une requête SELECT ou une fonction autorisée
-            const isSelect = queryStart === 'SELECT' || queryStart === 'WITH' || queryStart === 'SHOW' || queryStart === 'DESCRIBE' || hasAllowedFunction;
+            // Mots-clés sûrs pour la lecture seule
+            const safeKeywords = ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'EXPLAIN', 'VALUES'];
 
-            if (!isSelect) {
+            if (!safeKeywords.includes(queryStart)) {
               return `❌ **Requête bloquée en mode lecture seule**
 
 ⚠️ Seules les requêtes SELECT sont autorisées en mode readonly
-⚠️ Détecté: ${queryStart}
+⚠️ Commencement détecté: ${queryStart}
 
 💡 **Solutions:**
 1. Utilisez readonly: false pour autoriser les modifications
