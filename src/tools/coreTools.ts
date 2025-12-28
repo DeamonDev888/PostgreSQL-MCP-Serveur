@@ -237,32 +237,63 @@ export class CoreTools {
       }),
       execute: async (args) => {
         try {
-          // Validation automatique
+          // Validation automatique en mode readonly
           if (args.readonly) {
-            const queryUpper = args.sql.toUpperCase().trim();
-            const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER'];
-            const hasForbidden = forbidden.some(k => queryUpper.includes(k));
+            const queryTrimmed = args.sql.trim();
+            const queryStart = queryTrimmed.toUpperCase().split(/\s+/)[0];
 
-            if (hasForbidden) {
+            // Mots-clés dangereux au début de la requête
+            const dangerousKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE', 'VACUUM', 'REINDEX'];
+
+            // Vérifier si la requête commence par un mot-clé dangereux
+            if (dangerousKeywords.includes(queryStart)) {
               return `❌ **Requête bloquée en mode lecture seule**
 
-⚠️ Mots-clés détectés: ${forbidden.filter(k => queryUpper.includes(k)).join(', ')}
+⚠️ Mot-clé interdit détecté: ${queryStart}
 
 💡 **Solutions:**
 1. Utilisez readonly: false pour autoriser les modifications
 2. Ou utilisez l'outil 'insert' pour insérer des données
 3. Ou utilisez 'manage_vectors' pour les opérations vectorielles`;
             }
+
+            // Fonctions SQL autorisées (même en mode readonly)
+            const allowedFunctions = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT', 'GROUP_CONCAT', 'STRING_AGG'];
+            const hasAllowedFunction = allowedFunctions.some(f => queryTrimmed.toUpperCase().includes(f));
+
+            // Vérifier que c'est bien une requête SELECT ou une fonction autorisée
+            const isSelect = queryStart === 'SELECT' || queryStart === 'WITH' || queryStart === 'SHOW' || queryStart === 'DESCRIBE' || hasAllowedFunction;
+
+            if (!isSelect) {
+              return `❌ **Requête bloquée en mode lecture seule**
+
+⚠️ Seules les requêtes SELECT sont autorisées en mode readonly
+⚠️ Détecté: ${queryStart}
+
+💡 **Solutions:**
+1. Utilisez readonly: false pour autoriser les modifications
+2. Ou utilisez l'outil 'insert' pour insérer des données`;
+            }
           }
 
           const client = await this.pool.connect();
 
           try {
-            // Limite automatique pour SELECT
-            let finalSql = args.sql;
-            const queryUpper = args.sql.toUpperCase().trim();
-            if (!queryUpper.includes('LIMIT') && queryUpper.startsWith('SELECT')) {
-              finalSql = `SELECT * FROM (${args.sql}) AS limited_query LIMIT ${args.limit}`;
+            // Limite automatique pour SELECT (uniquement si pas déjà présente)
+            let finalSql = args.sql.trim();
+            const queryUpper = finalSql.toUpperCase();
+
+            // Vérifier si la requête contient déjà LIMIT
+            if (!queryUpper.includes('LIMIT') &&
+                (queryUpper.startsWith('SELECT') || queryUpper.startsWith('WITH'))) {
+
+              // Pour les requêtes simples, ajouter LIMIT directement
+              if (queryUpper.startsWith('SELECT') && !queryUpper.includes('(')) {
+                finalSql = `${finalSql} LIMIT ${args.limit}`;
+              } else {
+                // Pour les requêtes complexes (CTE, sous-requêtes), utiliser une sous-requête
+                finalSql = `SELECT * FROM (${args.sql}) AS limited_query LIMIT ${args.limit}`;
+              }
             }
 
             const startTime = Date.now();
