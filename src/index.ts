@@ -385,10 +385,17 @@ server.addTool({
 // 5. Exécuter une requête SQL
 server.addTool({
   name: 'execute_query',
-  description: 'Exécute une requête SQL et retourne les résultats',
+  description: `Exécute une requête SQL et retourne les résultats.
+
+⚠️ IMPORTANT pour les agents LLM:
+- Par défaut readonly=true: SELECT uniquement
+- Pour INSERT/UPDATE/DELETE: utilisez readonly=false
+- Pour les vecteurs pgvector: utilisez plutôt pgvector_insert_vector ou pgvector_search
+- Syntaxe vecteur: '[0.1,0.2]'::vector (pas ARRAY[], pas array_to_vector)
+- Consulter pgvector_help pour la syntaxe correcte`,
   parameters: z.object({
     query: z.string().describe('Requête SQL à exécuter'),
-    readonly: z.boolean().optional().default(true).describe('Mode lecture seule (recommandé)'),
+    readonly: z.boolean().optional().default(true).describe('⚠️ false requis pour INSERT/UPDATE/DELETE'),
     limit: z.number().optional().default(100).describe('Nombre maximum de résultats'),
   }),
   execute: async (args) => {
@@ -401,7 +408,13 @@ server.addTool({
         const hasForbidden = forbiddenKeywords.some(keyword => queryUpper.includes(keyword));
 
         if (hasForbidden) {
-          return `❌ Requête non autorisée en mode lecture seule. Mots-clés interdits: ${forbiddenKeywords.join(', ')}`;
+          return `❌ Requête non autorisée en mode lecture seule.
+
+💡 **Solutions:**
+1. Ajouter \`readonly: false\` pour autoriser les modifications
+2. Pour les vecteurs: utiliser \`pgvector_insert_vector\` (recommandé)
+
+Mots-clés détectés: ${forbiddenKeywords.filter(k => queryUpper.includes(k)).join(', ')}`;
         }
       }
 
