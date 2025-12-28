@@ -1,39 +1,62 @@
-# Outils PostgreSQL MCP
+# 🚀 PostgreSQL MCP Server - CoreTools
 
-## Gestion de la base de données
+## 📊 **Interface Unifiée - 8 Outils Core**
 
-- `postgres_status` - Vérifie le statut de connexion à la base de données
-- `test_connection` - Teste la connexion à la base de données
-- `get_connection_info` - Affiche les informations détaillées de la connexion actuelle
-- `list_databases` - Liste toutes les bases de données accessibles
-- `list_tables` - Liste toutes les tables d'une base de données
-- `describe_table` - Affiche la structure détaillée d'une table
+---
 
-## Exécution de requêtes
+### 🔍 **Exploration & Analyse**
+> **Découverte et diagnostic de l'infrastructure**
 
-- `execute_query` - Exécute une requête SQL et retourne les résultats
-- `validate_query` - Valide la syntaxe d'une requête SQL sans l'exécuter
+- `mcp__postgresql-server__explore` → Scanner et inventorier les bases, tables, schémas
+- `mcp__postgresql-server__diagnose` → Audit complet avec métriques temps réel
 
-## pgVector (vecteurs et recherche sémantique)
+---
 
-- `pgvector_check_extension` - Vérifie si l'extension pg_vector est installée
-- `pgvector_list_tables` - Liste toutes les tables contenant des colonnes vectorielles
-- `pgvector_create_column` - Ajoute une colonne vectorielle à une table existante ou crée une nouvelle table avec vecteurs
-- `pgvector_create_index` - Crée un index sur une colonne vectorielle
-- `pgvector_insert_vector` - Insère un vecteur dans une table
-- `pgvector_batch_insert` - Insère plusieurs vecteurs en une seule requête
-- `pgvector_search` - Recherche les vecteurs les plus similaires (nearest neighbors)
-- `pgvector_update` - Met à jour un vecteur existant
-- `pgvector_delete` - Supprime des vecteurs d'une table
-- `pgvector_stats` - Affiche des statistiques sur les colonnes vectorielles
+### ⚡ **Requêtes & Données**
+> **Interaction sécurisée avec les données**
 
-## Analyse et optimisation
+- `mcp__postgresql-server__query` → Exécution SQL avec validation & sandbox
+- `mcp__postgresql-server__search` → Recherche sémantique multi-mode (text|vector|hybrid)
+- `mcp__postgresql-server__insert` → Insertion auto-vectorisée (embedding 1536D)
 
-- `analyze_slow_queries` - Analyse les requêtes les plus lentes
-- `analyze_index_usage` - Analyse l'utilisation des index
-- `analyze_table_stats` - Affiche les statistiques détaillées des tables
-- `suggest_missing_indexes` - Suggère des index manquants
-- `analyze_cache_performance` - Analyse les performances du cache
-- `analyze_vacuum_needs` - Identifie les tables nécessitant un VACUUM/ANALYZE
-- `analyze_active_locks` - Affiche les locks actifs et les requêtes en attente
-- `generate_optimization_report` - Génère un rapport complet d'optimisation
+---
+
+### 🧬 **Gestion Vectorielle**
+> **Opérations pg_vector optimisées**
+
+- `mcp__postgresql-server__manage_vectors` → CRUD complet + index IVFFlat
+
+---
+
+### ⚙️ **Optimisation Performance**
+> **Tuning et surveillance continue**
+
+- `mcp__postgresql-server__optimize` → Analyse index + requêtes lentes + VACUUM
+
+---
+
+### ❓ **Assistance**
+> **Documentation intégrée**
+
+- `mcp__postgresql-server__help` → Guide contextuel interactif
+
+---
+
+## 🎯 **Architecture**
+
+```
+┌─────────────────────────────────────────────────┐
+│         PostgreSQL MCP Server v1.0              │
+├─────────────────────────────────────────────────┤
+│  🔧 CoreTools (8) - Interface Unifiée          │
+│                                                 │
+│  ✅ Simplicité : 8 outils vs 38 anciens        │
+│  ✅ Intelligence : Auto-détection modes         │
+│  ✅ Cohérence : Noms de verbes standardisés     │
+│  ✅ Sécurité : Validation & sandbox intégrés    │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+**🎓 Ready for Production | Optimized for LLM Agents**

@@ -2,6 +2,7 @@ import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { Pool } from 'pg';
 import Logger from '../utils/logger.js';
+import { embeddingService } from '../services/embeddingService.js';
 
 /**
  * Module pg_vector pour PostgreSQL MCP Server
@@ -220,6 +221,7 @@ export class PGVectorTools {
     this.createVectorColumn();
     this.insertVector();
     this.vectorSearch();
+    this.generateRandomVector();
     this.createVectorIndex();
     this.deleteVectors();
     this.vectorStats();
@@ -232,7 +234,7 @@ export class PGVectorTools {
     this.analyzeSlowQueries();
     this.pgvectorHelp();
 
-    Logger.info('✅ Outils pg_vector enregistrés (16 outils)');
+    Logger.info('✅ Outils pg_vector enregistrés (17 outils)');
   }
 
   // ========================================================================
@@ -434,9 +436,8 @@ CREATE EXTENSION vector;
       name: 'pgvector_insert_vector',
       description: `Insère un vecteur dans une table.
 
-⚠️ Pour les agents LLM: Si vous n'avez pas de vrai vecteur d'embedding,
-utilisez plutôt pgvector_insert_with_random_vector qui génère automatiquement
-un vecteur de la bonne dimension.`,
+🤖 Pour les agents LLM: Utilisez pgvector_insert_with_embedding qui génère
+automatiquement un vrai embedding basé sur le contenu textuel.`,
       parameters: z.object({
         tableName: z.string().describe('Nom de la table'),
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
@@ -498,13 +499,13 @@ un vecteur de la bonne dimension.`,
       },
     });
 
-    // Outil spécial pour LLM: insertion avec vecteur généré automatiquement
+    // Outil spécial pour LLM: insertion avec vecteur généré par embedding
     this.server.addTool({
-      name: 'pgvector_insert_with_random_vector',
-      description: `🤖 OUTIL POUR AGENTS LLM: Insère des données avec un vecteur GÉNÉRÉ AUTOMATIQUEMENT.
+      name: 'pgvector_insert_with_embedding',
+      description: `🤖 OUTIL POUR AGENTS LLM: Insère des données avec un vecteur EMBEDDING GÉNÉRÉ AUTOMATIQUEMENT.
 
-Parfait quand vous n'avez pas de vrai service d'embedding (OpenAI, etc.).
-Le vecteur sera généré par PostgreSQL avec les bonnes dimensions.
+Génère un embedding réel basé sur le contenu textuel (llm_interpretation, study_name, etc.).
+Utilise l'EmbeddingService (OpenAI ou mode mock).
 
 Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, sentiment, source_type`,
       parameters: z.object({
@@ -525,20 +526,31 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           const client = await this.pool.connect();
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
+          // Construire le texte pour l'embedding
+          const textParts: string[] = [];
+          if (args.llm_interpretation) textParts.push(args.llm_interpretation);
+          if (args.study_name) textParts.push(`Study: ${args.study_name}`);
+          if (args.symbol) textParts.push(`Symbol: ${args.symbol}`);
+          if (args.technical_data) textParts.push(`Technical: ${JSON.stringify(args.technical_data)}`);
+
+          const embeddingText = textParts.join(' | ') || 'No content provided';
+
+          // Générer l'embedding via EmbeddingService
+          Logger.info(`🔄 Génération embedding pour: "${embeddingText.substring(0, 50)}..."`);
+          const embedding = await embeddingService.generateEmbedding(embeddingText, {
+            dimensions: args.dimensions
+          });
+          Logger.info(`✅ Embedding généré: ${embedding.length} dimensions`);
+
           // Construire dynamiquement les colonnes et valeurs
           const columns: string[] = [args.vectorColumn];
           const valueParts: string[] = [];
           const values: any[] = [];
           let paramIndex = 1;
 
-          // Le vecteur est généré par PostgreSQL
-          valueParts.push(`(
-            SELECT ('[' || string_agg(
-              ROUND((0.1 + random() * 0.8)::numeric, 6)::text,
-              ', ' ORDER BY g
-            ) || ']')::vector
-            FROM generate_series(1, ${args.dimensions}) g
-          )`);
+          // Le vecteur embedding
+          valueParts.push(`$${paramIndex++}::vector`);
+          values.push(`[${embedding.join(',')}]`);
 
           // Ajouter les colonnes optionnelles
           if (args.symbol !== undefined) {
@@ -588,12 +600,12 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           const insertedId = result.rows[0]?.id;
 
-          Logger.info(`✅ [pgvector_insert_with_random_vector] ID: ${insertedId}`);
+          Logger.info(`✅ [pgvector_insert_with_embedding] ID: ${insertedId}`);
 
-          let output = `✅ **Données insérées avec succès**\n\n`;
+          let output = `✅ **Données insérées avec embedding**\n\n`;
           output += `📊 Table: ${args.schema}.${args.tableName}\n`;
           output += `🆔 ID: ${insertedId}\n`;
-          output += `📐 Vecteur: ${args.dimensions} dimensions (généré)\n\n`;
+          output += `🧠 Embedding: ${args.dimensions} dimensions (basé sur: "${embeddingText.substring(0, 50)}...")\n\n`;
 
           if (args.symbol) output += `   Symbol: ${args.symbol}\n`;
           if (args.study_name) output += `   Study: ${args.study_name}\n`;
@@ -602,7 +614,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_insert_with_random_vector]', error.message);
+          Logger.error('❌ [pgvector_insert_with_embedding]', error.message);
           return this.formatError(error, 'Insertion avec vecteur auto');
         }
       },
@@ -619,7 +631,9 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
       parameters: z.object({
         tableName: z.string().describe('Nom de la table'),
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        queryVector: z.array(z.number()).describe('Vecteur de requête'),
+        queryVector: z.array(z.number()).optional().describe('Vecteur de requête'),
+        useRandomVector: z.boolean().optional().default(false).describe('TESTS UNIQUEMENT: Génère un vecteur aléatoire pour tester les performances (ne pas utiliser pour la recherche réelle)'),
+        dimensions: z.number().optional().default(1536).describe('Dimensions du vecteur (1536 pour OpenAI)'),
         schema: z.string().optional().default('public').describe('Schéma de la table'),
         topK: z.number().optional().default(5).describe('Nombre de résultats à retourner'),
         distanceMetric: z.enum(['<=>', '<->', '<#>']).optional().default('<=>').describe('Métrique de distance: <=> (cosine), <-> (L2), <#> (inner product)'),
@@ -630,7 +644,25 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
         try {
           const client = await this.pool.connect();
 
-          const vectorString = `[${args.queryVector.join(',')}]`;
+          // Générer un vecteur aléatoire si demandé
+          let queryVector: number[];
+          let isRandom = false;
+
+          if (args.useRandomVector) {
+            // Générer un vecteur aléatoire normalisé
+            queryVector = [];
+            for (let i = 0; i < args.dimensions; i++) {
+              // Générer des valeurs aléatoires entre -1 et 1
+              queryVector.push((Math.random() * 2) - 1);
+            }
+            isRandom = true;
+          } else if (!args.queryVector) {
+            return '❌ Erreur: Vous devez fournir soit queryVector, soit activer useRandomVector';
+          } else {
+            queryVector = args.queryVector;
+          }
+
+          const vectorString = `[${queryVector.join(',')}]`;
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           // Nom de la métrique pour l'affichage
@@ -656,6 +688,12 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           await client.release();
 
           let output = `🔍 **Recherche vectorielle**\n`;
+          if (isRandom) {
+            output += `🎲 **Mode: Vecteur aléatoire (TESTS UNIQUEMENT)** (${args.dimensions} dimensions)\n`;
+            output += `⚠️ Pour la recherche réelle, utilisez intelligent_search ou fournissez queryVector\n`;
+          } else {
+            output += `🎯 **Mode: Vecteur fourni** (${args.dimensions} dimensions)\n`;
+          }
           output += `📊 Métrique: ${metricNames[args.distanceMetric]}\n`;
           output += `🎯 Top-K: ${args.topK}\n`;
           output += `⏱️ Durée: ${duration}ms\n`;
@@ -694,7 +732,79 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   }
 
   // ========================================================================
-  // 5. Créer un index vectoriel (HNSW ou IVFFlat)
+  // 5. Générer un vecteur aléatoire
+  // ========================================================================
+  private generateRandomVector(): void {
+    this.server.addTool({
+      name: 'pgvector_generate_random',
+      description: 'Génère un vecteur aléatoire pour tests et expérimentation',
+      parameters: z.object({
+        dimensions: z.number().optional().default(1536).describe('Dimensions du vecteur (1536 pour OpenAI)'),
+        min: z.number().optional().default(-1).describe('Valeur minimale'),
+        max: z.number().optional().default(1).describe('Valeur maximale'),
+        normalize: z.boolean().optional().default(true).describe('Normaliser le vecteur (recommandé pour cosine)'),
+      }),
+      execute: async (args) => {
+        try {
+          // Générer un vecteur aléatoire
+          let vector: number[] = [];
+          for (let i = 0; i < args.dimensions; i++) {
+            const value = args.min + (Math.random() * (args.max - args.min));
+            vector.push(value);
+          }
+
+          // Normaliser si demandé
+          if (args.normalize) {
+            const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+            if (magnitude > 0) {
+              vector = vector.map(val => val / magnitude);
+            }
+          }
+
+          let output = `🎲 **Vecteur aléatoire généré**\n\n`;
+          output += `📐 Dimensions: ${args.dimensions}\n`;
+          output += `📊 Plage: [${args.min}, ${args.max}]\n`;
+          output += `⚖️ Normalisé: ${args.normalize ? 'Oui ✅' : 'Non ❌'}\n\n`;
+
+          // Afficher les premières valeurs
+          output += `🔢 **Premières 10 valeurs:**\n`;
+          output += `[${vector.slice(0, 10).map(v => v.toFixed(6)).join(', ')}]\n\n`;
+
+          // Afficher la magnitude
+          const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+          output += `📏 Magnitude: ${magnitude.toFixed(6)}\n\n`;
+
+          // Afficher l'utilisation
+          output += `💡 **Utilisation:**\n`;
+          output += `Utilisez ce vecteur avec l'outil \`pgvector_search\`:\n\n`;
+          output += `\`\`\`json\n`;
+          output += `{\n`;
+          output += `  "tableName": "ma_table",\n`;
+          output += `  "queryVector": [${vector.slice(0, 20).join(', ')}, ...],\n`;
+          output += `  "topK": 5\n`;
+          output += `}\n`;
+          output += `\`\`\`\n\n`;
+          output += `Ou utilisez directement avec \`useRandomVector: true\`:\n\n`;
+          output += `\`\`\`json\n`;
+          output += `{\n`;
+          output += `  "tableName": "ma_table",\n`;
+          output += `  "useRandomVector": true,\n`;
+          output += `  "dimensions": ${args.dimensions},\n`;
+          output += `  "topK": 5\n`;
+          output += `}\n`;
+          output += `\`\`\`\n`;
+
+          return output;
+        } catch (error: any) {
+          Logger.error('❌ [pgvector_generate_random]', error.message);
+          return this.formatError(error, 'Erreur');
+        }
+      },
+    });
+  }
+
+  // ========================================================================
+  // 6. Créer un index vectoriel (HNSW ou IVFFlat)
   // ========================================================================
   private createVectorIndex(): void {
     this.server.addTool({
@@ -1393,7 +1503,6 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             const standardModels: Record<number, string> = {
               1536: 'OpenAI text-embedding-ada-002',
               3072: 'OpenAI text-embedding-3-large',
-              768: 'Sentence Transformers (bert-base)',
               384: 'Sentence Transformers (all-MiniLM-L6-v2)'
             };
             if (standardModels[dims]) {
@@ -1726,6 +1835,8 @@ INSERT INTO documents (embedding) VALUES (array_to_vector(...));  -- N'EXISTE PA
 
           search: `## 🔍 Recherche de similarité
 
+### 1. Recherche avec vecteur fourni
+
 \`\`\`sql
 -- Distance cosine (le plus courant) - opérateur <=>
 SELECT *, 1 - (embedding <=> '[0.1, 0.2, ...]'::vector) as similarity
@@ -1743,6 +1854,41 @@ SELECT * FROM documents
 ORDER BY embedding <#> '[0.1, 0.2, ...]'::vector
 LIMIT 10;
 \`\`\`
+
+### 2. Recherche avec vecteur aléatoire (🎲 NOUVEAU!)
+
+Utiliser un vecteur aléatoire pour tester votre base de données:
+
+\`\`\`json
+// Méthode 1: Utiliser l'option useRandomVector
+{
+  "tableName": "documents",
+  "useRandomVector": true,
+  "dimensions": 768,
+  "topK": 10,
+  "distanceMetric": "<=>"
+}
+
+// Méthode 2: Générer puis utiliser un vecteur
+// 1. Générer un vecteur aléatoire
+{
+  "tool": "pgvector_generate_random",
+  "dimensions": 768
+}
+
+// 2. Utiliser ce vecteur dans la recherche
+{
+  "tableName": "documents",
+  "queryVector": [0.123, -0.456, 0.789, ...],
+  "topK": 10
+}
+\`\`\`
+
+💡 **Cas d'usage du vecteur aléatoire:**
+- Tester les performances de recherche sans préparer de vecteur
+- Déboguer les index vectoriels
+- Vérifier la répartition des données dans l'espace vectoriel
+- Générer des exemples de requêtes
 `,
 
           functions: `## 📐 Fonctions pgvector
