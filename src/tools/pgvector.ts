@@ -230,8 +230,9 @@ export class PGVectorTools {
     this.normalizeVector();
     this.diagnostic();
     this.analyzeSlowQueries();
+    this.pgvectorHelp();
 
-    Logger.info('✅ Outils pg_vector enregistrés (14 outils)');
+    Logger.info('✅ Outils pg_vector enregistrés (16 outils)');
   }
 
   // ========================================================================
@@ -431,7 +432,11 @@ CREATE EXTENSION vector;
   private insertVector(): void {
     this.server.addTool({
       name: 'pgvector_insert_vector',
-      description: 'Insère un vecteur dans une table',
+      description: `Insère un vecteur dans une table.
+
+⚠️ Pour les agents LLM: Si vous n'avez pas de vrai vecteur d'embedding,
+utilisez plutôt pgvector_insert_with_random_vector qui génère automatiquement
+un vecteur de la bonne dimension.`,
       parameters: z.object({
         tableName: z.string().describe('Nom de la table'),
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
@@ -489,6 +494,116 @@ CREATE EXTENSION vector;
         } catch (error: any) {
           Logger.error('❌ [pgvector_insert_vector]', error.message);
           return this.formatError(error, 'Erreur');
+        }
+      },
+    });
+
+    // Outil spécial pour LLM: insertion avec vecteur généré automatiquement
+    this.server.addTool({
+      name: 'pgvector_insert_with_random_vector',
+      description: `🤖 OUTIL POUR AGENTS LLM: Insère des données avec un vecteur GÉNÉRÉ AUTOMATIQUEMENT.
+
+Parfait quand vous n'avez pas de vrai service d'embedding (OpenAI, etc.).
+Le vecteur sera généré par PostgreSQL avec les bonnes dimensions.
+
+Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, sentiment, source_type`,
+      parameters: z.object({
+        tableName: z.string().describe('Nom de la table (ex: sierra_embeddings)'),
+        dimensions: z.number().optional().default(1536).describe('Dimensions du vecteur (1536 pour OpenAI)'),
+        schema: z.string().optional().default('public').describe('Schéma de la table'),
+        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
+        // Colonnes spécifiques sierra_embeddings
+        symbol: z.string().optional().describe('Symbole (ex: ETHUSD-BMEX)'),
+        study_name: z.string().optional().describe('Nom de l\'étude (ex: MACD, RSI)'),
+        technical_data: z.record(z.any()).optional().describe('Données techniques en JSON'),
+        llm_interpretation: z.string().optional().describe('Interprétation LLM du signal'),
+        sentiment: z.enum(['BULLISH', 'BEARISH', 'NEUTRAL']).optional().describe('Sentiment du marché'),
+        source_type: z.enum(['algo', 'llm']).optional().default('llm').describe('Source: algo ou llm'),
+      }),
+      execute: async (args) => {
+        try {
+          const client = await this.pool.connect();
+          const fullTableName = `"${args.schema}"."${args.tableName}"`;
+
+          // Construire dynamiquement les colonnes et valeurs
+          const columns: string[] = [args.vectorColumn];
+          const valueParts: string[] = [];
+          const values: any[] = [];
+          let paramIndex = 1;
+
+          // Le vecteur est généré par PostgreSQL
+          valueParts.push(`(
+            SELECT ('[' || string_agg(
+              ROUND((0.1 + random() * 0.8)::numeric, 6)::text,
+              ', ' ORDER BY g
+            ) || ']')::vector
+            FROM generate_series(1, ${args.dimensions}) g
+          )`);
+
+          // Ajouter les colonnes optionnelles
+          if (args.symbol !== undefined) {
+            columns.push('symbol');
+            valueParts.push(`$${paramIndex++}`);
+            values.push(args.symbol);
+          }
+
+          if (args.study_name !== undefined) {
+            columns.push('study_name');
+            valueParts.push(`$${paramIndex++}`);
+            values.push(args.study_name);
+          }
+
+          if (args.technical_data !== undefined) {
+            columns.push('technical_data');
+            valueParts.push(`$${paramIndex++}::jsonb`);
+            values.push(JSON.stringify(args.technical_data));
+          }
+
+          if (args.llm_interpretation !== undefined) {
+            columns.push('llm_interpretation');
+            valueParts.push(`$${paramIndex++}`);
+            values.push(args.llm_interpretation);
+          }
+
+          if (args.sentiment !== undefined) {
+            columns.push('sentiment');
+            valueParts.push(`$${paramIndex++}`);
+            values.push(args.sentiment);
+          }
+
+          if (args.source_type !== undefined) {
+            columns.push('source_type');
+            valueParts.push(`$${paramIndex++}`);
+            values.push(args.source_type);
+          }
+
+          const query = `
+            INSERT INTO ${fullTableName} (${columns.join(', ')})
+            VALUES (${valueParts.join(', ')})
+            RETURNING id
+          `;
+
+          const result = await client.query(query, values);
+          client.release();
+
+          const insertedId = result.rows[0]?.id;
+
+          Logger.info(`✅ [pgvector_insert_with_random_vector] ID: ${insertedId}`);
+
+          let output = `✅ **Données insérées avec succès**\n\n`;
+          output += `📊 Table: ${args.schema}.${args.tableName}\n`;
+          output += `🆔 ID: ${insertedId}\n`;
+          output += `📐 Vecteur: ${args.dimensions} dimensions (généré)\n\n`;
+
+          if (args.symbol) output += `   Symbol: ${args.symbol}\n`;
+          if (args.study_name) output += `   Study: ${args.study_name}\n`;
+          if (args.sentiment) output += `   Sentiment: ${args.sentiment}\n`;
+          if (args.llm_interpretation) output += `   Interpretation: ${args.llm_interpretation.substring(0, 100)}...\n`;
+
+          return output;
+        } catch (error: any) {
+          Logger.error('❌ [pgvector_insert_with_random_vector]', error.message);
+          return this.formatError(error, 'Insertion avec vecteur auto');
         }
       },
     });
@@ -1551,6 +1666,140 @@ Aucune requête trouvée avec au moins ${args.minExecutions} exécutions.
           Logger.error('❌ [analyze_slow_queries]', error.message);
           return this.formatError(error, 'Analyse des requêtes lentes');
         }
+      },
+    });
+  }
+
+  // ========================================================================
+  // 15. Guide de syntaxe pgvector pour LLM
+  // ========================================================================
+  private pgvectorHelp(): void {
+    this.server.addTool({
+      name: 'pgvector_help',
+      description: `📚 Guide de syntaxe pgvector pour les agents LLM.
+
+IMPORTANT: Utilisez cet outil AVANT d'écrire des requêtes SQL avec des vecteurs!
+Retourne la syntaxe correcte pour pgvector (différente des tableaux PostgreSQL classiques).`,
+      parameters: z.object({
+        topic: z.enum(['all', 'create', 'insert', 'search', 'functions', 'errors']).optional().default('all')
+          .describe('Sujet: all, create, insert, search, functions, errors'),
+      }),
+      execute: async (args) => {
+        let output = `📚 **Guide de Syntaxe pgvector pour LLM**\n\n`;
+
+        const topics = {
+          create: `## 🔧 Créer une colonne/table vectorielle
+
+\`\`\`sql
+-- Créer une table avec vecteurs
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  content TEXT,
+  embedding vector(1536)  -- ⚠️ Pas ARRAY, c'est "vector(dimensions)"
+);
+
+-- Ajouter une colonne à une table existante
+ALTER TABLE ma_table ADD COLUMN embedding vector(1536);
+
+-- Modifier les dimensions d'une colonne
+ALTER TABLE ma_table ALTER COLUMN embedding TYPE vector(384);
+\`\`\`
+`,
+
+          insert: `## ✏️ Insérer des vecteurs
+
+\`\`\`sql
+-- ✅ CORRECT: Format chaîne avec crochets, puis cast ::vector
+INSERT INTO documents (content, embedding)
+VALUES ('texte', '[0.1, 0.2, 0.3, ...]'::vector);
+
+-- ✅ CORRECT: Avec paramètre $1
+INSERT INTO documents (content, embedding)
+VALUES ($1, $2::vector);
+-- Où $2 = '[0.1, 0.2, 0.3]' (chaîne)
+
+-- ❌ INCORRECT: N'utilisez JAMAIS ces syntaxes
+INSERT INTO documents (embedding) VALUES (ARRAY[0.1, 0.2]);  -- FAUX!
+INSERT INTO documents (embedding) VALUES (array_to_vector(...));  -- N'EXISTE PAS!
+\`\`\`
+`,
+
+          search: `## 🔍 Recherche de similarité
+
+\`\`\`sql
+-- Distance cosine (le plus courant) - opérateur <=>
+SELECT *, 1 - (embedding <=> '[0.1, 0.2, ...]'::vector) as similarity
+FROM documents
+ORDER BY embedding <=> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+
+-- Distance L2 (euclidienne) - opérateur <->
+SELECT * FROM documents
+ORDER BY embedding <-> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+
+-- Produit scalaire (inner product) - opérateur <#>
+SELECT * FROM documents
+ORDER BY embedding <#> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+\`\`\`
+`,
+
+          functions: `## 📐 Fonctions pgvector
+
+\`\`\`sql
+-- Obtenir les dimensions d'un vecteur
+SELECT vector_dims(embedding) FROM documents LIMIT 1;
+-- ⚠️ Pas array_length() qui ne fonctionne PAS avec vector!
+
+-- Norme L2 d'un vecteur
+SELECT vector_norm(embedding) FROM documents;
+
+-- Calculer la distance entre deux vecteurs
+SELECT '[1,2,3]'::vector <=> '[4,5,6]'::vector as cosine_distance;
+SELECT '[1,2,3]'::vector <-> '[4,5,6]'::vector as l2_distance;
+
+-- Vérifier le type d'une colonne
+SELECT column_name, data_type, udt_name
+FROM information_schema.columns
+WHERE table_name = 'documents' AND column_name = 'embedding';
+\`\`\`
+`,
+
+          errors: `## ❌ Erreurs courantes et solutions
+
+| Erreur | Cause | Solution |
+|--------|-------|----------|
+| \`expected X dimensions, not Y\` | Vecteur de mauvaise taille | Utilisez un modèle d'embedding correspondant aux dimensions de la colonne |
+| \`array_length(vector, integer) does not exist\` | Mauvaise fonction | Utilisez \`vector_dims(colonne)\` au lieu de \`array_length()\` |
+| \`array_to_vector() does not exist\` | Fonction inexistante | Cast direct: \`'[...]'::vector\` |
+| \`syntax error at or near ";"\` | Mauvaise syntaxe vecteur | Format correct: \`'[0.1,0.2,0.3]'::vector\` (chaîne avec crochets) |
+| \`invalid input syntax for type vector\` | Format invalide | Vérifiez les crochets et virgules: \`'[0.1, 0.2]'::vector\` |
+
+### Modèles d'embedding standards:
+| Dimensions | Modèle | Provider |
+|------------|--------|----------|
+| 1536 | text-embedding-ada-002 | OpenAI |
+| 3072 | text-embedding-3-large | OpenAI |
+| 1024 | text-embedding-3-small | OpenAI |
+| 768 | all-mpnet-base-v2 | HuggingFace |
+| 384 | all-MiniLM-L6-v2 | Sentence Transformers |
+`
+        };
+
+        if (args.topic === 'all') {
+          output += topics.create + '\n';
+          output += topics.insert + '\n';
+          output += topics.search + '\n';
+          output += topics.functions + '\n';
+          output += topics.errors + '\n';
+        } else {
+          output += topics[args.topic];
+        }
+
+        output += `\n---\n💡 **Conseil LLM:** Utilisez toujours \`pgvector_insert_vector\` et \`pgvector_search\` au lieu d'écrire du SQL brut!\n`;
+
+        return output;
       },
     });
   }
