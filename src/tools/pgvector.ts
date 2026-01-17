@@ -1,4 +1,4 @@
-import { FastMCP } from 'fastmcp';
+﻿import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { Pool } from 'pg';
 import Logger from '../utils/logger.js';
@@ -29,40 +29,30 @@ export class PGVectorTools {
    * Guide des modèles d'embedding standards avec leurs dimensions
    */
   private static readonly EMBEDDING_MODELS_GUIDE: Record<number, { model: string; provider: string; description: string }> = {
+    4096: {
+      model: 'qwen/qwen3-embedding-8b',
+      provider: 'OpenRouter / Alibaba',
+      description: 'Modèle SOTA haute performance (Défaut Système)'
+    },
     1536: {
       model: 'text-embedding-ada-002',
       provider: 'OpenAI',
-      description: 'Modèle standard OpenAI, excellent rapport qualité/coût'
+      description: 'Ancien standard OpenAI'
     },
     3072: {
       model: 'text-embedding-3-large',
       provider: 'OpenAI',
-      description: 'Modèle haute précision OpenAI (2024+)'
+      description: 'Modèle haute précision OpenAI'
     },
     1024: {
       model: 'text-embedding-3-small',
       provider: 'OpenAI',
-      description: 'Modèle léger et rapide OpenAI (2024+)'
+      description: 'Modèle léger OpenAI'
     },
     768: {
-      model: 'bert-base-uncased / all-mpnet-base-v2',
-      provider: 'HuggingFace / Sentence Transformers',
-      description: 'Modèle open-source performant'
-    },
-    384: {
-      model: 'all-MiniLM-L6-v2',
-      provider: 'Sentence Transformers',
-      description: 'Modèle léger, idéal pour le local'
-    },
-    4096: {
-      model: 'embed-english-v3.0',
-      provider: 'Cohere',
-      description: 'Modèle multilingue haute performance'
-    },
-    256: {
-      model: 'nomic-embed-text-v1',
-      provider: 'Nomic AI',
-      description: 'Modèle open-source compact'
+      model: 'bert-base-uncased',
+      provider: 'HuggingFace',
+      description: 'Modèle open-source classique'
     }
   };
 
@@ -76,14 +66,14 @@ export class PGVectorTools {
 
     const sortedDims = Object.keys(PGVectorTools.EMBEDDING_MODELS_GUIDE)
       .map(Number)
-      .sort((a, b) => a - b);
+      .sort((a, b) => b - a); // Descending order to show 4096 first
 
     for (const dim of sortedDims) {
       const info = PGVectorTools.EMBEDDING_MODELS_GUIDE[dim];
       guide += `| **${dim}** | ${info.model} | ${info.provider} | ${info.description} |\n`;
     }
 
-    guide += `\n💡 **Recommandation:** Pour la production, utilisez **1536** (OpenAI ada-002) ou **384** (MiniLM local)\n`;
+    guide += `\n💡 **Recommandation:** Utilisez **4096** (Qwen) pour une précision maximale avec ce système.\n`;
     return guide;
   }
 
@@ -341,7 +331,7 @@ CREATE EXTENSION vector;
       parameters: z.object({
         tableName: z.string().describe('Nom de la table'),
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        dimensions: z.number().describe('Dimension des vecteurs (ex: 1536 pour OpenAI ada-002)'),
+        dimensions: z.number().optional().default(4096).describe('Dimension des vecteurs (4096 pour Qwen 8B)'),
         schema: z.string().optional().default('public').describe('Schéma de la table'),
         createTable: z.boolean().optional().default(false).describe('Créer la table si elle n\'existe pas'),
         idColumn: z.string().optional().default('id').describe('Nom de la colonne ID (si création de table)'),
@@ -349,6 +339,7 @@ CREATE EXTENSION vector;
         additionalColumns: z.string().optional().describe('Colonnes supplémentaires (ex: content TEXT, metadata JSONB)'),
       }),
       execute: async (args) => {
+        // ... (unchanged execution logic) ...
         try {
           const client = await this.pool.connect();
 
@@ -498,19 +489,24 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
         }
       },
     });
+  }
 
+  // ========================================================================
+  // 4. Insérer avec embedding auto (LLM)
+  // ========================================================================
+  private insertWithEmbedding(): void {
     // Outil spécial pour LLM: insertion avec vecteur généré par embedding
     this.server.addTool({
       name: 'pgvector_insert_with_embedding',
       description: `🤖 OUTIL POUR AGENTS LLM: Insère des données avec un vecteur EMBEDDING GÉNÉRÉ AUTOMATIQUEMENT.
 
 Génère un embedding réel basé sur le contenu textuel (llm_interpretation, study_name, etc.).
-Utilise l'EmbeddingService (OpenAI ou mode mock).
+Utilise l'EmbeddingService (Qwen/OpenRouter par défaut).
 
 Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, sentiment, source_type`,
       parameters: z.object({
         tableName: z.string().describe('Nom de la table (ex: sierra_embeddings)'),
-        dimensions: z.number().optional().default(1536).describe('Dimensions du vecteur (1536 pour OpenAI)'),
+        dimensions: z.number().optional().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
         schema: z.string().optional().default('public').describe('Schéma de la table'),
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
         // Colonnes spécifiques sierra_embeddings
@@ -522,7 +518,8 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
         source_type: z.enum(['algo', 'llm']).optional().default('llm').describe('Source: algo ou llm'),
       }),
       execute: async (args) => {
-        try {
+          // ... (execution logic stays mostly same, but relies on new default args)
+          try {
           const client = await this.pool.connect();
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
@@ -633,7 +630,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
         vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
         queryVector: z.array(z.number()).optional().describe('Vecteur de requête'),
         useRandomVector: z.boolean().optional().default(false).describe('TESTS UNIQUEMENT: Génère un vecteur aléatoire pour tester les performances (ne pas utiliser pour la recherche réelle)'),
-        dimensions: z.number().optional().default(1536).describe('Dimensions du vecteur (1536 pour OpenAI)'),
+        dimensions: z.number().optional().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
         schema: z.string().optional().default('public').describe('Schéma de la table'),
         topK: z.number().optional().default(5).describe('Nombre de résultats à retourner'),
         distanceMetric: z.enum(['<=>', '<->', '<#>']).optional().default('<=>').describe('Métrique de distance: <=> (cosine), <-> (L2), <#> (inner product)'),
@@ -641,6 +638,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
         whereClause: z.string().optional().describe('Clause WHERE additionnelle (ex: category = \'docs\')'),
       }),
       execute: async (args) => {
+  
         try {
           const client = await this.pool.connect();
 
@@ -739,12 +737,13 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
       name: 'pgvector_generate_random',
       description: 'Génère un vecteur aléatoire pour tests et expérimentation',
       parameters: z.object({
-        dimensions: z.number().optional().default(1536).describe('Dimensions du vecteur (1536 pour OpenAI)'),
+        dimensions: z.number().optional().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
         min: z.number().optional().default(-1).describe('Valeur minimale'),
         max: z.number().optional().default(1).describe('Valeur maximale'),
         normalize: z.boolean().optional().default(true).describe('Normaliser le vecteur (recommandé pour cosine)'),
       }),
       execute: async (args) => {
+        // ... (unchanged logic)
         try {
           // Générer un vecteur aléatoire
           let vector: number[] = [];
@@ -802,7 +801,6 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
       },
     });
   }
-
   // ========================================================================
   // 6. Créer un index vectoriel (HNSW ou IVFFlat)
   // ========================================================================
