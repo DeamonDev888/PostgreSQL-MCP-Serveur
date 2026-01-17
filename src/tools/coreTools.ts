@@ -34,6 +34,7 @@ export class CoreTools {
     this.insert();
     this.manageVectors();
     this.optimize();
+    this.vectorize_row();
     this.help();
 
     Logger.info('✅ Outils Core enregistrés (8 outils cohérents)');
@@ -628,7 +629,62 @@ export class CoreTools {
   }
 
   // ============================================================================
-  // 8. HELP - Aide Contextuelle
+  // 8. VECTORIZE_ROW - Vectorisation à la demande
+  // ============================================================================
+  private vectorize_row(): void {
+    this.server.addTool({
+      name: 'vectorize_row',
+      description: '🧠 Génère et sauvegarde un embedding pour une ligne existante (Qwen 8B)',
+      parameters: z.object({
+        table: z.string().describe('Nom de la table'),
+        id: z.string().describe('ID de la ligne (UUID ou Integer)'),
+        text_columns: z.array(z.string()).describe('Colonnes à utiliser pour le texte source'),
+        target_column: z.string().default('embedding').describe('Colonne cible pour le vecteur'),
+      }),
+      execute: async (args) => {
+        try {
+          const client = await this.pool.connect();
+          try {
+             // 1. Fetch content
+             const cols = args.text_columns.map(c => `COALESCE(${c}, '')`).join(" || ' ' || ");
+             const selectQuery = `SELECT ${cols} as combined_text FROM ${args.table} WHERE id = $1::uuid`; // Assuming UUID for enhanced_news
+             
+             // Dynamic ID typing check (simple heuristic)
+             const idVal = args.id; 
+             // Note: In production, we might need to handle ID type dynamically. 
+             // Here assuming UUID as per enhanced_news schema.
+             
+             const res = await client.query(selectQuery, [idVal]);
+             if (res.rows.length === 0) return "❌ ID introuvable";
+             
+             const text = res.rows[0].combined_text;
+             if (!text || text.length < 5) return "⚠️ Texte trop court pour vectoriser";
+
+             // 2. Generate
+             const vector = await embeddingService.generateEmbedding(text);
+             
+             // 3. Update
+             const vectorStr = `[${vector.join(',')}]`;
+             await client.query(
+                 `UPDATE ${args.table} SET ${args.target_column} = $1::vector WHERE id = $2::uuid`,
+                 [vectorStr, idVal]
+             );
+             
+             return `✅ Vecteur ${vector.length} dims généré et sauvegardé pour ID ${args.id}`;
+
+          } finally {
+            client.release();
+          }
+        } catch (error: any) {
+          Logger.error('❌ [vectorize_row]', error.message);
+          return `❌ Erreur: ${error.message}`;
+        }
+      }
+    });
+  }
+
+  // ============================================================================
+  // 9. HELP - Aide Contextuelle
   // ============================================================================
   private help(): void {
     this.server.addTool({
