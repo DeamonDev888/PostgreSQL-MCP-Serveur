@@ -11,12 +11,14 @@
     "watch": "tsx watch src/index.ts",
     "check": "node -e \"dist/config.js && echo '✅ Configuration OK'\"",
     "test": "node test_complet.js",
+    "test:qwen3": "node dist/scripts/test_qwen3_integration.js",
     "clean": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))fs.rmSync('dist',{recursive:true});const files=fs.readdirSync('.').filter(f=>f.endsWith('.log'));files.forEach(f=>fs.unlinkSync(f));console.log('✅ Cleaned')\"",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "prebuild": "npm run clean",
     "postbuild": "echo ✅ Build completed successfully",
-    "mcp:test": "node dist/index.js"
+    "mcp:test": "node dist/index.js",
+    "migrate:qwen3": "psql -U postgres -d financial_analyst -f migrations/migrate_to_qwen3_1024.sql"
   },
   "keywords": [
     "mcp",
@@ -31,12 +33,13 @@
   "author": "Deamon",
   "license": "MIT",
   "dependencies": {
-    "fastmcp": "^3.25.4",
-    "pg": "^8.11.3",
-    "zod": "^3.22.4",
+    "@xenova/transformers": "^2.14.0",
+    "axios": "^1.13.2",
     "dotenv": "^16.3.1",
+    "fastmcp": "^3.25.4",
     "openai": "^4.20.0",
-    "@xenova/transformers": "^2.14.0"
+    "pg": "^8.11.3",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
