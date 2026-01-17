@@ -83,3 +83,20 @@ docker pull pgvector/pgvector:pg16
 ```
 
 - **Linux** : `sudo apt install postgresql-16-pgvector`
+
+---
+
+## 🧠 Intelligence Sémantique (New v1.1)
+
+Le serveur supporte désormais nativement **Qwen3 Embedding 8B** via OpenRouter pour des recherches sémantiques haute précision.
+
+- **Modèle** : `qwen/qwen3-embedding-8b` (4096 dimensions).
+- **Mode Strict** : Pas de données simulées. Si l'API est absente, le service s'arrête.
+- **Configuration** :
+  Ajoutez votre clé API dans `.env` :
+  ```env
+  OPEN_ROUTER_API_KEY=sk-or-v1-...
+  ```
+- **Maintenance** :
+  Script de backfill inclus pour mettre à jour l'historique :
+  `npx tsx src/scripts/backfill_embeddings.ts`

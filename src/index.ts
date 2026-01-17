@@ -110,7 +110,7 @@ async function main() {
     Logger.info(`   • Base: ${dbConfig.POSTGRES_DATABASE}`);
     Logger.info(`   • Hôte: ${dbConfig.POSTGRES_HOST}:${dbConfig.POSTGRES_PORT}`);
     Logger.info(`   • SSL: ${config.database.ssl !== false ? 'Activé' : 'Désactivé'}`);
-    Logger.info(`   • Outils: 8 (coreTools cohérents - diagnose, explore, query, search, insert, manage_vectors, optimize, help)`);
+    Logger.info(`   • Outils: 8 (Core Tools)`);
   } catch (error: any) {
     const isConnectionError = error.code === 'ECONNREFUSED' ||
                               error.code === 'ENOTFOUND' ||
