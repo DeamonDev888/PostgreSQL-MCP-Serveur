@@ -16,7 +16,7 @@
 
 ![Architecture](assets/image.png)
 
-Un serveur MCP pour interagir avec PostgreSQL via Claude.
+Un serveur MCP pour interagir avec PostgreSQL.
 
 ## 🚀 Démarrage Rapide
 
