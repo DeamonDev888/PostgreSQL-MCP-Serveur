@@ -313,8 +313,8 @@ export class CoreTools {
                 const values = headers.map((h: string) => {
                   const val = row[h];
                   if (val === null) return 'NULL';
-                  if (typeof val === 'object') return JSON.stringify(val).substring(0, 50);
-                  return String(val).substring(0, 50);
+                  if (typeof val === 'object') return JSON.stringify(val).substring(0, 300);
+                  return String(val).substring(0, 300);
                 });
                 output += `| ${values.join(' | ')} |\n`;
               });
