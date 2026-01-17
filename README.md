@@ -14,7 +14,7 @@
 
 ---
 
-![Architecture](assets/image.png)
+![Architecture](assets/image2.png)
 
 Un serveur MCP pour interagir avec PostgreSQL.
 
