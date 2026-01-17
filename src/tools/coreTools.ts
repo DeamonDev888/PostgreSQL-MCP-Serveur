@@ -224,74 +224,80 @@ export class CoreTools {
   }
 
   // ============================================================================
-  // 3. QUERY - Exécution de Requêtes SQL
+  // 3. MCP_PG_VECTOR - Exécution SQL avec Guides LLM
   // ============================================================================
   private query(): void {
     this.server.addTool({
-      name: 'query',
-      description: '⚡ Exécute et valide les requêtes SQL avec sécurité intégrée',
+      name: 'MCP_PG_VECTOR',
+      description: `⚡ EXÉCUTION SQL DIRECTE (PostgreSQL + Vector)
+
+🔒 **SÉCURITÉ:**
+- Par défaut: readonly=true (SELECT seul)
+- Pour INSERT/UPDATE: readonly=false OBLIGATOIRE
+- "query" est l'ancien nom, utilisez MAINTENANT "MCP_PG_VECTOR"
+
+📋 **EXEMPLES:**
+MCP_PG_VECTOR({ sql: "SELECT * FROM users", readonly: true })
+MCP_PG_VECTOR({ sql: "INSERT INTO logs VALUES ('test')", readonly: false })
+
+💡 **POUR L'AGENT:** C'est VOTRE outil principal pour interagir avec la base.`,
       parameters: z.object({
         sql: z.string().describe('Requête SQL à exécuter'),
         validateOnly: z.boolean().default(false).describe('Valider sans exécuter'),
-        readonly: z.boolean().default(true).describe('Mode lecture seule (SELECT uniquement)'),
+        readonly: z.boolean().default(true).describe('Mode lecture seule. FALSE = ÉCRITURE AUTORISÉE'),
         limit: z.number().default(100).describe('Limite de résultats'),
       }),
       execute: async (args) => {
         try {
+          const queryTrimmed = args.sql.trim();
+          const queryUpper = queryTrimmed.toUpperCase();
+          const queryType = queryTrimmed.split(/\s+/)[0].toUpperCase();
+          
+          // Détection du type de requête pour guide LLM
+          const isMutationQuery = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b/.test(queryUpper);
+          
           // Validation automatique en mode readonly
+          if (args.readonly && isMutationQuery) {
+            return `❌ **Requête bloquée en mode lecture seule**
+
+⚠️ Vous essayez d'exécuter une requête ${queryType} en mode readonly=true
+
+🔧 **CORRECTION REQUISE:**
+Réessayez avec: MCP_PG_VECTOR({ sql: "...", readonly: false })
+
+💡 **Exemple pour ${queryType}:**
+\`\`\`
+MCP_PG_VECTOR({
+  sql: "${queryType === 'INSERT' ? 'INSERT INTO table (col) VALUES (val)' : queryType === 'UPDATE' ? 'UPDATE table SET col = val WHERE id = X' : 'DELETE FROM table WHERE id = X'}",
+  readonly: false
+})
+\`\`\``;
+          }
+
+          // Vérifier que les requêtes SELECT commencent correctement
           if (args.readonly) {
-            const queryTrimmed = args.sql.trim();
-            const queryUpper = queryTrimmed.toUpperCase();
-
-            // Utilisation de regex au niveau des mots pour éviter les faux positifs
-            // \b确保 nous détectons les mots entiers (ex: "CREATE" dans "created_at" ne sera pas détecté)
-            const hasDangerousKeyword = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REINDEX)\b/.test(queryUpper);
-
-            if (hasDangerousKeyword) {
-              return `❌ **Requête bloquée en mode lecture seule**
-
-⚠️ Mot-clé interdit détecté dans la requête
-
-💡 **Solutions:**
-1. Utilisez readonly: false pour autoriser les modifications
-2. Ou utilisez l'outil 'insert' pour insérer des données
-3. Ou utilisez 'manage_vectors' pour les opérations vectorielles`;
-            }
-
-            // Vérifier que la requête commence par un mot-clé sûr
-            const queryStart = queryTrimmed.split(/\s+/)[0].toUpperCase();
-
-            // Mots-clés sûrs pour la lecture seule
             const safeKeywords = ['SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'EXPLAIN', 'VALUES'];
+            if (!safeKeywords.includes(queryType)) {
+              return `❌ **Requête non reconnue en mode lecture**
 
-            if (!safeKeywords.includes(queryStart)) {
-              return `❌ **Requête bloquée en mode lecture seule**
+⚠️ Le début de requête "${queryType}" n'est pas autorisé en readonly
 
-⚠️ Seules les requêtes SELECT sont autorisées en mode readonly
-⚠️ Commencement détecté: ${queryStart}
-
-💡 **Solutions:**
-1. Utilisez readonly: false pour autoriser les modifications
-2. Ou utilisez l'outil 'insert' pour insérer des données`;
+💡 **Actions possibles:**
+1. Pour une lecture: Utilisez SELECT, WITH, ou EXPLAIN
+2. Pour une modification: Ajoutez readonly: false`;
             }
           }
 
           const client = await this.pool.connect();
 
           try {
-            // Limite automatique pour SELECT (uniquement si pas déjà présente)
-            let finalSql = args.sql.trim();
-            const queryUpper = finalSql.toUpperCase();
-
-            // Vérifier si la requête contient déjà LIMIT
+            // Limite automatique pour SELECT
+            let finalSql = queryTrimmed;
             if (!queryUpper.includes('LIMIT') &&
                 (queryUpper.startsWith('SELECT') || queryUpper.startsWith('WITH'))) {
-
-              // Pour les requêtes simples, ajouter LIMIT directement
               if (queryUpper.startsWith('SELECT') && !queryUpper.includes('(')) {
                 finalSql = `${finalSql} LIMIT ${args.limit}`;
               } else {
-                // Pour les requêtes complexes (CTE, sous-requêtes), utiliser une sous-requête
                 finalSql = `SELECT * FROM (${args.sql}) AS limited_query LIMIT ${args.limit}`;
               }
             }
@@ -300,6 +306,41 @@ export class CoreTools {
             const result = await client.query(finalSql);
             const duration = Date.now() - startTime;
 
+            // === OUTPUT ADAPTÉ AU TYPE DE REQUÊTE ===
+            
+            // Pour les mutations (INSERT, UPDATE, DELETE)
+            if (isMutationQuery) {
+              let output = `✅ **${queryType} exécuté avec succès**\n\n`;
+              output += `⏱️ Durée: ${duration}ms\n`;
+              output += `📊 Lignes affectées: ${result.rowCount || 0}\n`;
+              
+              // Si RETURNING utilisé, afficher les données retournées
+              if (result.rows && result.rows.length > 0) {
+                output += `\n📋 **Données retournées:**\n`;
+                const headers = Object.keys(result.rows[0]);
+                output += `| ${headers.join(' | ')} |\n`;
+                output += `|${headers.map(() => '---').join('|')}|\n`;
+                result.rows.slice(0, 5).forEach((row: any) => {
+                  const values = headers.map((h: string) => {
+                    const val = row[h];
+                    if (val === null) return 'NULL';
+                    return String(val).substring(0, 100);
+                  });
+                  output += `| ${values.join(' | ')} |\n`;
+                });
+              }
+              
+              output += `\n💡 **Prochaine action suggérée:**\n`;
+              if (queryType === 'INSERT') {
+                output += `Vérifiez avec: SELECT * FROM ${this.extractTableName(queryTrimmed)} ORDER BY id DESC LIMIT 1`;
+              } else if (queryType === 'UPDATE' || queryType === 'DELETE') {
+                output += `Confirmez le changement avec une requête SELECT`;
+              }
+              
+              return output;
+            }
+
+            // Pour les SELECT
             let output = `⚡ **Requête exécutée**\n\n`;
             output += `⏱️ Durée: ${duration}ms\n`;
             output += `📊 Résultats: ${result.rows.length} ligne(s)\n\n`;
@@ -323,6 +364,11 @@ export class CoreTools {
               if (result.rows.length > 20) {
                 output += `\n... et ${result.rows.length - 20} autres lignes`;
               }
+            } else {
+              output += `ℹ️ Aucun résultat trouvé\n`;
+              output += `\n💡 **Suggestions:**\n`;
+              output += `- Vérifiez les critères de recherche\n`;
+              output += `- Utilisez explore({ type: 'tables' }) pour lister les tables disponibles`;
             }
 
             return output;
@@ -333,10 +379,49 @@ export class CoreTools {
 
         } catch (error: any) {
           Logger.error('❌ [query]', error.message);
-          return `❌ Erreur SQL: ${error.message}`;
+          
+          // Messages d'erreur contextuels pour LLM
+          const errorMsg = error.message.toLowerCase();
+          let guidance = '';
+          
+          if (errorMsg.includes('relation') && errorMsg.includes('does not exist')) {
+            const tableName = error.message.match(/relation "([^"]+)"/)?.[1] || 'unknown';
+            guidance = `\n\n💡 **Guide LLM:** La table "${tableName}" n'existe pas.\n`;
+            guidance += `Utilisez explore({ type: 'tables' }) pour voir les tables disponibles.`;
+          } else if (errorMsg.includes('column') && errorMsg.includes('does not exist')) {
+            const colName = error.message.match(/column "([^"]+)"/)?.[1] || 'unknown';
+            guidance = `\n\n💡 **Guide LLM:** La colonne "${colName}" n'existe pas.\n`;
+            guidance += `Utilisez explore({ type: 'schema', target: 'table_name' }) pour voir les colonnes.`;
+          } else if (errorMsg.includes('syntax error')) {
+            guidance = `\n\n💡 **Guide LLM:** Erreur de syntaxe SQL. Vérifiez:\n`;
+            guidance += `- Les guillemets (simples pour valeurs, doubles pour identifiants)\n`;
+            guidance += `- Les virgules et parenthèses\n`;
+            guidance += `- Les mots-clés SQL`;
+          } else if (errorMsg.includes('violates foreign key')) {
+            guidance = `\n\n💡 **Guide LLM:** Contrainte de clé étrangère violée.\n`;
+            guidance += `Vérifiez que l'ID référencé existe dans la table parent.`;
+          }
+          
+          return `❌ **Erreur SQL:** ${error.message}${guidance}`;
         }
       },
     });
+  }
+
+  /**
+   * Extrait le nom de table d'une requête INSERT/UPDATE/DELETE
+   */
+  private extractTableName(sql: string): string {
+    const insertMatch = sql.match(/INSERT\s+INTO\s+(\w+)/i);
+    if (insertMatch) return insertMatch[1];
+    
+    const updateMatch = sql.match(/UPDATE\s+(\w+)/i);
+    if (updateMatch) return updateMatch[1];
+    
+    const deleteMatch = sql.match(/DELETE\s+FROM\s+(\w+)/i);
+    if (deleteMatch) return deleteMatch[1];
+    
+    return 'table_name';
   }
 
   // ============================================================================
