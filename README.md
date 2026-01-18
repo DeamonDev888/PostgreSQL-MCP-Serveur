@@ -114,20 +114,21 @@ Le serveur supporte désormais nativement **Qwen3 Embedding 8B** via OpenRouter 
 ```typescript
 use_tool("manage_vectors", {
   action: "create",
-  table: "market_analysis",
+  table: "knowledge_base",
   dimensions: 4096, // Standard Qwen 8B
 });
 ```
 
-### 2. Sauvegarder une analyse (Auto-Embedding)
+### 2. Sauvegarder un document (Auto-Embedding)
 
 ```typescript
 use_tool("insert", {
-  table: "market_analysis",
+  table: "knowledge_base",
   data: {
-    symbol: "ES_F",
-    sentiment: "BEARISH",
-    content: "Le marché montre des signes de fatigue...",
+    category: "documentation",
+    title: "Guide d'Installation",
+    content: "Pour installer le système, commencez par cloner le dépôt...",
+    author: "DevTeam",
   },
   generateEmbedding: true, // 🪄 Génère le vecteur 4096d automatiquement
 });
@@ -137,9 +138,15 @@ use_tool("insert", {
 
 ```typescript
 use_tool("search", {
-  query: "Quels sont les niveaux de support sur le SP500 ?",
-  table: "market_analysis",
+  query: "Comment installer le système ?",
+  table: "knowledge_base",
   mode: "hybrid",
   topK: 5,
 });
 ```
+
+---
+
+## 📦 Outils Disponibles
+
+Liste complète des 9 outils Core simplifiés : [Voir la documentation des outils](docs/liste_outils.md)
