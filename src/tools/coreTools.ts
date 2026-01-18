@@ -494,8 +494,8 @@ MCP_PG_VECTOR({
       parameters: z.object({
         table: z.string().describe('Nom de la table'),
         data: z.record(z.any()).describe('Données à insérer (objet JSON)'),
-        generateEmbedding: z.boolean().default(false).describe('Générer un embedding automatiquement'),
-        dimensions: z.number().default(1536).describe('Dimensions du vecteur (si embedding)'),
+        generateEmbedding: z.boolean().default(false).describe('Générer un embedding automatiquement (Qwen 8B)'),
+        dimensions: z.number().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
       }),
       execute: async (args) => {
         try {
@@ -563,7 +563,7 @@ MCP_PG_VECTOR({
         action: z.enum(['create', 'index', 'stats', 'optimize', 'list']).describe('Action à effectuer'),
         table: z.string().describe('Nom de la table'),
         column: z.string().default('embedding').describe('Colonne vectorielle'),
-        dimensions: z.number().default(1536).describe('Dimensions du vecteur'),
+        dimensions: z.number().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
       }),
       execute: async (args) => {
         try {
@@ -732,12 +732,10 @@ MCP_PG_VECTOR({
           try {
              // 1. Fetch content
              const cols = args.text_columns.map(c => `COALESCE(${c}, '')`).join(" || ' ' || ");
-             const selectQuery = `SELECT ${cols} as combined_text FROM ${args.table} WHERE id = $1::uuid`; // Assuming UUID for enhanced_news
+             const selectQuery = `SELECT ${cols} as combined_text FROM ${args.table} WHERE id = $1`;
              
              // Dynamic ID typing check (simple heuristic)
              const idVal = args.id; 
-             // Note: In production, we might need to handle ID type dynamically. 
-             // Here assuming UUID as per enhanced_news schema.
              
              const res = await client.query(selectQuery, [idVal]);
              if (res.rows.length === 0) return "❌ ID introuvable";
@@ -746,12 +744,12 @@ MCP_PG_VECTOR({
              if (!text || text.length < 5) return "⚠️ Texte trop court pour vectoriser";
 
              // 2. Generate
-             const vector = await embeddingService.generateEmbedding(text);
+             const vector = await embeddingService.generateEmbedding(text, { dimensions: 4096 });
              
              // 3. Update
              const vectorStr = `[${vector.join(',')}]`;
              await client.query(
-                 `UPDATE ${args.table} SET ${args.target_column} = $1::vector WHERE id = $2::uuid`,
+                 `UPDATE ${args.table} SET ${args.target_column} = $1::vector WHERE id = $2`,
                  [vectorStr, idVal]
              );
              
