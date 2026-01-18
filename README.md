@@ -82,7 +82,11 @@ avec docker sur Windows
 docker pull pgvector/pgvector:pg16
 ```
 
-- **Linux** : `sudo apt install postgresql-16-pgvector`
+**Linux/Mac**
+
+```bash
+sudo apt install postgresql-16-pgvector
+```
 
 ---
 
@@ -100,3 +104,42 @@ Le serveur supporte désormais nativement **Qwen3 Embedding 8B** via OpenRouter 
 - **Maintenance** :
   Script de backfill inclus pour mettre à jour l'historique :
   `npx tsx src/scripts/backfill_embeddings.ts`
+
+---
+
+## 💡 Exemples d'Usage (Agent)
+
+### 1. Préparer une table pour Qwen (4096 dimensions)
+
+```typescript
+use_tool("manage_vectors", {
+  action: "create",
+  table: "market_analysis",
+  dimensions: 4096, // Standard Qwen 8B
+});
+```
+
+### 2. Sauvegarder une analyse (Auto-Embedding)
+
+```typescript
+use_tool("insert", {
+  table: "market_analysis",
+  data: {
+    symbol: "ES_F",
+    sentiment: "BEARISH",
+    content: "Le marché montre des signes de fatigue...",
+  },
+  generateEmbedding: true, // 🪄 Génère le vecteur 4096d automatiquement
+});
+```
+
+### 3. Recherche de contexte (RAG)
+
+```typescript
+use_tool("search", {
+  query: "Quels sont les niveaux de support sur le SP500 ?",
+  table: "market_analysis",
+  mode: "hybrid",
+  topK: 5,
+});
+```

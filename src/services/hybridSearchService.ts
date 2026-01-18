@@ -168,14 +168,25 @@ export class HybridSearchService {
       const vectorStartTime = Date.now();
 
       const ids = textResults.rows.map((row: any) => row.id);
+      
+      // Adaptation dynamique pour UUID ou Integer
+      // Si enhanced_news (UUID), on cast le VALUES en UUID
+      // Si autre table (Integer), on cast en Integer ou laisse par défaut
+      const isUUID = tableName === 'enhanced_news';
+      const idType = isUUID ? '::uuid' : '';
+      
+      // Construction de la clause VALUES pour le JOIN
+      // Ex: ($2::uuid, 1), ($3::uuid, 2)...
+      const valuesClause = ids.map((id: any, index: number) => `($${index + 2}${idType}, ${index + 1})`).join(', ');
+
       const vectorQuery = `
         SELECT
           d.*,
           1 - (d.${vectorColumn} <=> $1::vector) as similarity,
-          t.text_rank as text_rank
+          t.rank as text_rank_index
         FROM ${tableName} d
         JOIN (
-          VALUES ${ids.map((id: number, index: number) => `($${index + 2}, ${index + 1})`).join(', ')}
+          VALUES ${valuesClause}
         ) AS t(id, rank) ON d.id = t.id
         ORDER BY d.${vectorColumn} <=> $1::vector
         LIMIT $${ids.length + 2}
@@ -191,11 +202,16 @@ export class HybridSearchService {
       Logger.debug(`✅ Vecteur: ${vectorResults.rows.length} résultats en ${vectorSearchTime}ms`);
 
       // ÉTAPE 4: Fusion et classement
-      const mergedResults = vectorResults.rows.map((row: any, index: number) => ({
-        ...row,
-        rank: index + 1,
-        final_score: (row.similarity * 0.7) + (row.text_rank * 0.3), // Score hybride
-      }));
+      const mergedResults = vectorResults.rows.map((row: any, index: number) => {
+          // Score texte approximatif basé sur le rang (1er = 1.0, 2ème = 0.9...)
+          const textScore = 1.0 / (row.text_rank_index || 100); 
+          
+          return {
+            ...row,
+            rank: index + 1,
+            final_score: (row.similarity * 0.7) + (textScore * 0.3), // Score hybride
+          };
+      });
 
       // Trier par score final
       mergedResults.sort((a: any, b: any) => b.final_score - a.final_score);
