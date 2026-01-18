@@ -14,7 +14,9 @@
 
 ---
 
-![Architecture](assets/image2.png)
+<p align="center">
+  <img src="assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
+</p>
 
 Un serveur MCP pour interagir avec PostgreSQL.
 
