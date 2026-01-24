@@ -66,13 +66,14 @@ export class IntelligentSearchService {
       };
 
       switch (detectedMode) {
-        case 'text':
+        case 'text': {
           const textResult = await this.hybridSearch.textSearch(query, tableName, 'content', topK);
           results = textResult.results;
           metadata = { ...metadata, ...textResult.metadata };
           break;
+        }
 
-        case 'vector':
+        case 'vector': {
           const vectorResult = await this.performVectorSearch(query, tableName, topK, enableCache);
           results = vectorResult.results;
           metadata = {
@@ -82,8 +83,9 @@ export class IntelligentSearchService {
             cacheHit: vectorResult.fromCache
           };
           break;
+        }
 
-        case 'hybrid':
+        case 'hybrid': {
           const hybridResult = await this.hybridSearch.search(query, {
             tableName,
             topK,
@@ -97,6 +99,7 @@ export class IntelligentSearchService {
             embeddingGenerated: true
           };
           break;
+        }
 
         default:
           throw new Error(`Mode non supporté: ${detectedMode}`);
@@ -320,7 +323,7 @@ export class IntelligentSearchService {
             await this.search(query, { tableName, mode: mode as any });
             totalTime += Date.now() - start;
             successCount++;
-          } catch (error) {
+          } catch {
             Logger.error(`❌ Échec mode ${mode}: "${query}"`);
           }
         }

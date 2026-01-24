@@ -1,7 +1,7 @@
 
 import { Pool } from 'pg';
 import { embeddingService } from '../services/embeddingService.js';
-import config, { dbConfig } from '../config.js';
+import config from '../config.js';
 import Logger from '../utils/logger.js';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -46,13 +46,15 @@ async function backfillEmbeddings() {
         Logger.info(`📏 API Model 'qwen/qwen3-embedding-8b' returns ${apiDims} dimensions.`);
 
         // Check DB Column Type
-        const schemaRes = await pool.query(`
+        /*
+        const _schemaRes = await pool.query(`
             SELECT atttypmod 
             FROM pg_attribute 
             WHERE attrelid = 'enhanced_news'::regclass 
             AND attname = 'embedding'
         `);
-        const dbDims = schemaRes.rows[0]?.atttypmod; // vector typmod is usually dims
+        */
+        // const dbDims = schemaRes.rows[0]?.atttypmod; // vector typmod is usually dims
         
         // Note: pg_vector typmod needs parsing or just try/catch the insert. 
         // Simpler: Just try to ALTER if catch error implies mismatch? 
