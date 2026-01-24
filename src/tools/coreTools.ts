@@ -104,7 +104,7 @@ export class CoreTools {
                   perfOutput += `  ${i + 1}. ${q.duration.toFixed(2)}ms - ${q.query.substring(0, 80)}...\n`;
                 });
               }
-            } catch (e) {
+            } catch {
               // pg_stat_statements non activé
             }
 

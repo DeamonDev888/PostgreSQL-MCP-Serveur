@@ -120,7 +120,7 @@ export class HybridSearchService {
     textLimit: number,
     useCache: boolean
   ): Promise<{ results: any[]; metadata: any }> {
-    const startTime = Date.now();
+    // const startTime = Date.now();
     const client = await this.pool.connect();
 
     try {
@@ -242,7 +242,7 @@ export class HybridSearchService {
     topK: number,
     useCache: boolean
   ): Promise<{ results: any[]; metadata: any }> {
-    const startTime = Date.now();
+    // const startTime = Date.now();
     const client = await this.pool.connect();
 
     try {
