@@ -367,7 +367,7 @@ export class DBOptimizer {
           });
           report.push('');
         }
-      } catch (e) {
+      } catch {
         // pg_stat_statements n'est peut-Ãªtre pas activÃ©
         report.push('## ðŸ“ˆ Note');
         report.push('Activer `pg_stat_statements` pour analyser les requÃªtes lentes');
