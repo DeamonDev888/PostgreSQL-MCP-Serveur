@@ -148,7 +148,7 @@ export class EmbeddingService {
     Logger.info('🧹 Cache vidé');
   }
 
-  async benchmark(texts: string[]): Promise<any> {
+  async benchmark(_texts: string[]): Promise<any> {
      // ... (Benchmark kept simple)
      return { averageTime: 0, totalTime: 0, successRate: 0 }; 
   }

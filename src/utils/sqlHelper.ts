@@ -1,4 +1,4 @@
-import { z } from 'zod';
+// import { z } from 'zod';
 
 // Types pour la validation SQL
 export interface SQLValidationResult {
@@ -50,7 +50,7 @@ export function validateSQL(query: string): SQLValidationResult {
 
   // Analyser le type de requête
   let analysis = '';
-  let warnings: string[] = [];
+  const warnings: string[] = [];
 
   if (trimmedQuery.startsWith('SELECT')) {
     analysis = 'Requête de sélection de données';

@@ -196,7 +196,7 @@ export class PGVectorTools {
     } else {
       output += `\n💡 Vérifiez:\n`;
       output += `   - La connexion à la base de données\n`;
-      output += `   - L\'extension pgvector est installée\n`;
+      output += `   - L'extension pgvector est installée\n`;
       output += `   - Les noms de table/colonne sont corrects\n`;
     }
 
@@ -445,7 +445,7 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           let query = `INSERT INTO ${fullTableName} (${args.vectorColumn}`;
-          let values: any[] = [vectorString];
+          const values: any[] = [vectorString];
           let paramIndex = 2;
 
           // Colonnes additionnelles
@@ -1218,7 +1218,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
                 expectedDimensions = parseInt(colResult.rows[0].character_maximum_length);
               }
               await client.release();
-            } catch (e) {
+            } catch {
               // Ignorer les erreurs lors de la récupération des dimensions
             }
           }
@@ -1242,7 +1242,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             dimensionsSet.add(vec.length);
 
             // Vérifier valeurs invalides
-            vec.forEach((val, i) => {
+            vec.forEach((val) => {
               if (isNaN(val)) nanVectors.push(index);
               if (!isFinite(val)) infVectors.push(index);
             });
