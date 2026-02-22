@@ -29,6 +29,7 @@
                         <li><a href="#install" class="nav-link">Installation</a></li>
                         <li><a href="#library" class="nav-link">Bibliothèque</a></li>
                         <li><a href="#structure" class="nav-link">Structure</a></li>
+                        <li><a href="#advanced" class="nav-link">Exemples</a></li>
                         <li><a href="https://deamondev888.github.io/overmind-mcp/" target="_blank" class="nav-link nav-link-highlight"><i class="fas fa-brain"></i> OverMind-MCP</a></li>
                     </ul>
                     <div class="mobile-toggle">
@@ -72,25 +73,39 @@
                     <div class="hero-stats">
                         <div class="stat">
                             <div class="stat-value" data-target="4096">0</div>
-                            <div class="stat-label">Dimensions Mémoire</div>
+                            <div class="stat-label">Dimensions Vecteurs</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value" data-target="100">0</div>
-                            <div class="stat-label">% Type-Safe</div>
+                            <div class="stat-value" data-target="15">0</div>
+                            <div class="stat-label">ms Latence SQL</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value" data-target="8">0</div>
-                            <div class="stat-label">Modèles Supportés</div>
+                            <div class="stat-value" data-target="99">0</div>
+                            <div class="stat-label">% Précision RAG</div>
                         </div>
                     </div>
                 </div>
                 <div class="hero-visual">
-                    <div class="brain-container">
-                        <div class="brain-core"></div>
-                        <div class="brain-ring ring-1"></div>
-                        <div class="brain-ring ring-2"></div>
-                        <div class="brain-ring ring-3"></div>
-                        <div class="brain-particles"></div>
+                    <div class="relational-nexus">
+                        <div class="database-core">
+                            <i class="fas fa-database"></i>
+                            <div class="core-waves">
+                                <div class="wave wave-1"></div>
+                                <div class="wave wave-2"></div>
+                                <div class="wave wave-3"></div>
+                            </div>
+                        </div>
+                        <div class="vector-nodes" id="vector-nodes">
+                            <!-- Dynamically generated vector particles -->
+                        </div>
+                        <div class="relational-lattice" id="relational-lattice">
+                            <!-- SVG lattice for table relationships -->
+                        </div>
+                        <div class="terminal-overlay">
+                            <div class="term-line">> SELECT * FROM neural_embeddings</div>
+                            <div class="term-line">> EMBEDDING: 4096D_VECTOR_READY</div>
+                            <div class="term-line">> STATUS: INDEX_OPTIMIZED</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -340,6 +355,258 @@ const memory = await searchService.storeKnowledge({
                         <i class="fas fa-export"></i>
                         <span>src/index.ts</span>
                         <span class="tree-desc">Exports publics (API)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="advanced-examples" id="advanced">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-rocket"></i>
+                        Cas d'Usage Avancés
+                    </h2>
+                    <p class="section-subtitle">Exemples concrets pour vos projets IA</p>
+                </div>
+                <div class="advanced-grid">
+                    <div class="advanced-card">
+                        <div class="advanced-header">
+                            <i class="fas fa-comments"></i>
+                            <h3>Chatbot avec Mémoire</h3>
+                            <span class="advanced-tag">RAG</span>
+                        </div>
+                        <div class="advanced-content">
+                            <p>Créez un chatbot qui se souvient de toutes les conversations et retrouve le contexte pertinent.</p>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span class="code-title">TypeScript</span>
+                                    <div class="code-actions">
+                                        <button class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre><code class="language-typescript">// 1. Stocker une conversation
+await searchService.storeKnowledge({
+  text: "User: Comment installer ?\nBot: Via npx -y overmind-postgres-mcp",
+  table: "chat_history",
+  metadata: { userId: "123", date: "2026-02-22" }
+});
+
+// 2. Rechercher le contexte pertinent
+const context = await searchService.hybridSearch({
+  query: "Installation avec npx",
+  table: "chat_history",
+  filters: { userId: "123" }
+});</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="advanced-card">
+                        <div class="advanced-header">
+                            <i class="fas fa-file-alt"></i>
+                            <h3>Analyse de Documents</h3>
+                            <span class="advanced-tag">Enterprise</span>
+                        </div>
+                        <div class="advanced-content">
+                            <p>Indexez et recherchez dans des milliers de documents PDF, Markdown ou textes.</p>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span class="code-title">TypeScript</span>
+                                    <div class="code-actions">
+                                        <button class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre><code class="language-typescript">// Indexer un document
+await searchService.storeKnowledge({
+  text: documentContent,
+  table: "enterprise_docs",
+  metadata: {
+    title: "Guide Technique",
+    category: "Engineering",
+    author: "John Doe",
+    tags: ["technical", "guide"]
+  }
+});
+
+// Recherche sémantique par catégorie
+const results = await searchService.hybridSearch({
+  query: "Comment déployer en production ?",
+  table: "enterprise_docs",
+  filters: { category: "Engineering" }
+});</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="advanced-card">
+                        <div class="advanced-header">
+                            <i class="fas fa-brain"></i>
+                            <h3>Agent Multi-Tâches</h3>
+                            <span class="advanced-tag">Orchestration</span>
+                        </div>
+                        <div class="advanced-content">
+                            <p>Plusieurs agents partagent une mémoire commune tout en gardant leurs souvenirs privés.</p>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span class="code-title">TypeScript</span>
+                                    <div class="code-actions">
+                                        <button class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre><code class="language-typescript">// Agent 1: Expert SEO
+await searchService.storeKnowledge({
+  text: "Meilleures pratiques SEO 2026",
+  table: "shared_knowledge",
+  agentName: "seo-expert"
+});
+
+// Agent 2: Analyste Marketing
+await searchService.storeKnowledge({
+  text: "Stratégie marketing Q1",
+  table: "shared_knowledge",
+  agentName: "marketing-analyst"
+});
+
+// Les deux agents accèdent à la mémoire commune
+const insights = await searchService.hybridSearch({
+  query: "Stratégie SEO et marketing",
+  table: "shared_knowledge"
+});</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="advanced-card">
+                        <div class="advanced-header">
+                            <i class="fas fa-code-branch"></i>
+                            <h3>Base de Code Intelligente</h3>
+                            <span class="advanced-tag">DevTools</span>
+                        </div>
+                        <div class="advanced-content">
+                            <p>Indexez votre codebase pour permettre des recherches sémantiques naturelles.</p>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span class="code-title">TypeScript</span>
+                                    <div class="code-actions">
+                                        <button class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre><code class="language-typescript">// Indexer un fichier
+await searchService.storeKnowledge({
+  text: `
+    // Fonction d'authentification
+    export async function authenticate(user) {
+      return await db.users.findOne({ email: user.email });
+    }
+  `,
+  table: "codebase",
+  metadata: {
+    file: "auth.ts",
+    language: "typescript",
+    functions: ["authenticate"]
+  }
+});
+
+// Rechercher par intention
+const authCode = await searchService.hybridSearch({
+  query: "Comment authentifier un utilisateur ?",
+  table: "codebase"
+});</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="advanced-card">
+                        <div class="advanced-header">
+                            <i class="fas fa-shopping-cart"></i>
+                            <h3>Recherche E-Commerce</h3>
+                            <span class="advanced-tag">Business</span>
+                        </div>
+                        <div class="advanced-content">
+                            <p>Recherche produits par description, caractéristiques et avis clients.</p>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span class="code-title">TypeScript</span>
+                                    <div class="code-actions">
+                                        <button class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre><code class="language-typescript">// Indexer un produit
+await searchService.storeKnowledge({
+  text: `
+    Laptop ultra-léger, 16GB RAM, 512GB SSD,
+    Écran 4K, Parfait pour les développeurs
+  `,
+  table: "products",
+  metadata: {
+    id: "prod_123",
+    price: 1299.99,
+    category: "Computers",
+    rating: 4.8
+  }
+});
+
+// Recherche naturelle
+const laptops = await searchService.hybridSearch({
+  query: "Ordinateur portable pour développeur",
+  table: "products",
+  filters: { category: "Computers" }
+});</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="advanced-card">
+                        <div class="advanced-header">
+                            <i class="fas fa-graduation-cap"></i>
+                            <h3>Système de Tutorat IA</h3>
+                            <span class="advanced-tag">Education</span>
+                        </div>
+                        <div class="advanced-content">
+                            <p>Créez un tuteur personnalisé qui s'adapte au niveau de l'étudiant.</p>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span class="code-title">TypeScript</span>
+                                    <div class="code-actions">
+                                        <button class="copy-btn">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <pre><code class="language-typescript">// Enregistrer les progrès
+await searchService.storeKnowledge({
+  text: `
+    Étudiant maîtrise: variables, boucles
+    Difficultés: récursion, algorithmes
+    Niveau: intermédiaire
+  `,
+  table: "student_progress",
+  metadata: {
+    studentId: "student_456",
+    subject: "programming",
+    lastUpdate: "2026-02-22"
+  }
+});
+
+// Générer un cours personnalisé
+const lessons = await searchService.hybridSearch({
+  query: "Exercices pour améliorer la récursion",
+  table: "tutorials",
+  mode: "vector"
+});</code></pre>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

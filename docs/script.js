@@ -42,22 +42,6 @@ window.addEventListener('resize', () => {
     canvas.height = window.innerHeight;
 });
 
-// Header scroll effect
-const header = document.querySelector('header');
-let lastScroll = 0;
-
-window.addEventListener('scroll', () => {
-    const currentScroll = window.pageYOffset;
-
-    if (currentScroll > 100) {
-        header.classList.add('scrolled');
-    } else {
-        header.classList.remove('scrolled');
-    }
-
-    lastScroll = currentScroll;
-});
-
 // Tab functionality
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -255,17 +239,100 @@ featureCards.forEach(card => {
     });
 });
 
-// Brain core click effect
-const brainCore = document.querySelector('.brain-core');
-if (brainCore) {
-    brainCore.addEventListener('click', () => {
-        brainCore.style.animation = 'none';
-        brainCore.offsetHeight; // Trigger reflow
-        brainCore.style.animation = 'brainPulse 0.5s ease-in-out';
+// Relational Vector Nexus Animation
+const nexus = document.querySelector('.relational-nexus');
+const vectorNodesContainer = document.getElementById('vector-nodes');
+const latticeContainer = document.getElementById('relational-lattice');
 
-        // Create particles explosion
-        for (let i = 0; i < 20; i++) {
-            createParticle(brainCore);
+if (nexus) {
+    const nodes = [];
+    const numNodes = 20;
+    const centerX = 250;
+    const centerY = 250;
+
+    // SVG for lines
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    latticeContainer.appendChild(svg);
+
+    // Initialize Vector Nodes
+    for (let i = 0; i < numNodes; i++) {
+        const node = document.createElement('div');
+        node.className = 'vector-node';
+        vectorNodesContainer.appendChild(node);
+
+        nodes.push({
+            el: node,
+            x: Math.random() * 500,
+            y: Math.random() * 500,
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: (Math.random() - 0.5) * 1.5,
+            history: []
+        });
+    }
+
+    function animateNexus() {
+        svg.innerHTML = '';
+        
+        nodes.forEach((node, i) => {
+            node.x += node.vx;
+            node.y += node.vy;
+
+            // Bounce
+            if (node.x < 0 || node.x > 500) node.vx *= -1;
+            if (node.y < 0 || node.y > 500) node.vy *= -1;
+
+            node.el.style.left = `${node.x - 4}px`;
+            node.el.style.top = `${node.y - 4}px`;
+
+            // Draw lines to core if close
+            const distToCore = Math.hypot(node.x - centerX, node.y - centerY);
+            if (distToCore < 180) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', centerX);
+                line.setAttribute('y1', centerY);
+                line.setAttribute('x2', node.x);
+                line.setAttribute('y2', node.y);
+                line.setAttribute('class', 'lattice-line');
+                line.style.opacity = (1 - distToCore / 180) * 0.4;
+                svg.appendChild(line);
+            }
+
+            // Draw lines between nodes
+            for (let j = i + 1; j < nodes.length; j++) {
+                const other = nodes[j];
+                const dist = Math.hypot(node.x - other.x, node.y - other.y);
+                if (dist < 100) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', node.x);
+                    line.setAttribute('y1', node.y);
+                    line.setAttribute('x2', other.x);
+                    line.setAttribute('y2', other.y);
+                    line.setAttribute('class', 'lattice-line');
+                    line.style.opacity = (1 - dist / 100) * 0.2;
+                    svg.appendChild(line);
+                }
+            }
+        });
+
+        requestAnimationFrame(animateNexus);
+    }
+
+    animateNexus();
+
+    // Core Interaction
+    const dbCore = document.querySelector('.database-core');
+    dbCore.addEventListener('click', () => {
+        // Pulse wave
+        nodes.forEach(node => {
+            const angle = Math.atan2(node.y - centerY, node.x - centerX);
+            const force = 10;
+            node.vx = Math.cos(angle) * force;
+            node.vy = Math.sin(angle) * force;
+        });
+
+        // Trigger particles
+        for (let i = 0; i < 30; i++) {
+            createParticle(dbCore);
         }
     });
 }
