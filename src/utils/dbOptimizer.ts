@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool } from "pg";
 
 // Types pour les analyses d'optimisation
 export interface SlowQuery {
@@ -38,7 +38,7 @@ export interface MissingIndex {
   table: string;
   columns: string;
   suggested_index: string;
-  potential_impact: 'HIGH' | 'MEDIUM' | 'LOW';
+  potential_impact: "HIGH" | "MEDIUM" | "LOW";
   estimated_gain: string;
 }
 
@@ -62,15 +62,17 @@ export class DBOptimizer {
 
     try {
       const result = await this.pool.query(query, [limit]);
-      return result.rows.map(row => ({
+      return result.rows.map((row) => ({
         query: row.query,
         duration: parseFloat(row.mean_time),
         calls: parseInt(row.calls),
         mean_time: parseFloat(row.mean_time),
-        total_time: parseFloat(row.total_time)
+        total_time: parseFloat(row.total_time),
       }));
     } catch (error: any) {
-      throw new Error(`Erreur lors de la rÃ©cupÃ©ration des requÃªtes lentes: ${error.message}`);
+      throw new Error(
+        `Erreur lors de la rÃ©cupÃ©ration des requÃªtes lentes: ${error.message}`,
+      );
     }
   }
 
@@ -92,12 +94,12 @@ export class DBOptimizer {
 
     try {
       const result = await this.pool.query(query);
-      return result.rows.map(row => ({
+      return result.rows.map((row) => ({
         tablename: row.tablename,
         indexname: row.indexname,
         indexdef: row.indexdef,
         size: row.size,
-        usage: parseInt(row.usage || 0)
+        usage: parseInt(row.usage || 0),
       }));
     } catch (error: any) {
       throw new Error(`Erreur lors de l'analyse des index: ${error.message}`);
@@ -134,7 +136,7 @@ export class DBOptimizer {
 
     try {
       const result = await this.pool.query(query);
-      return result.rows.map(row => ({
+      return result.rows.map((row) => ({
         tablename: row.tablename,
         seq_scan: parseInt(row.seq_scan || 0),
         seq_tup_read: parseInt(row.seq_tup_read || 0),
@@ -148,10 +150,12 @@ export class DBOptimizer {
         last_vacuum: row.last_vacuum,
         last_autovacuum: row.last_autovacuum,
         last_analyze: row.last_analyze,
-        last_autoanalyze: row.last_autoanalyze
+        last_autoanalyze: row.last_autoanalyze,
       }));
     } catch (error: any) {
-      throw new Error(`Erreur lors de la rÃ©cupÃ©ration des statistiques: ${error.message}`);
+      throw new Error(
+        `Erreur lors de la rÃ©cupÃ©ration des statistiques: ${error.message}`,
+      );
     }
   }
 
@@ -173,7 +177,8 @@ export class DBOptimizer {
 
     for (const table of tablesWithHighSeqScan.rows) {
       // SuggÃ©rer des index basÃ©s sur les colonnes frÃ©quemment utilisÃ©es dans WHERE
-      const commonWhereColumns = await this.pool.query(`
+      const commonWhereColumns = await this.pool.query(
+        `
         SELECT
           attname as column_name
         FROM pg_attribute a
@@ -185,20 +190,22 @@ export class DBOptimizer {
           AND NOT a.attisdropped
           AND a.attnotnull = true
         ORDER BY a.attnum
-      `, [table.tablename]);
+      `,
+        [table.tablename],
+      );
 
       if (commonWhereColumns.rows.length > 0) {
         const columns = commonWhereColumns.rows
           .slice(0, 3) // Prendre les 3 premiÃ¨res colonnes
-          .map(col => col.column_name)
-          .join(', ');
+          .map((col) => col.column_name)
+          .join(", ");
 
         suggestions.push({
           table: table.tablename,
           columns,
           suggested_index: `CREATE INDEX idx_${table.tablename}_${commonWhereColumns.rows[0].column_name} ON ${table.tablename} (${columns});`,
-          potential_impact: table.seq_scan > 10000 ? 'HIGH' : 'MEDIUM',
-          estimated_gain: `RÃ©duction potentielle de ${Math.round((table.seq_scan / (table.seq_scan + 100)) * 100)}% des sequential scans`
+          potential_impact: table.seq_scan > 10000 ? "HIGH" : "MEDIUM",
+          estimated_gain: `RÃ©duction potentielle de ${Math.round((table.seq_scan / (table.seq_scan + 100)) * 100)}% des sequential scans`,
         });
       }
     }
@@ -230,9 +237,9 @@ export class DBOptimizer {
     try {
       const result = await this.pool.query(query);
       // Formatter dead_tuple_percent en JavaScript (plus compatible)
-      return result.rows.map(row => ({
+      return result.rows.map((row) => ({
         ...row,
-        dead_tuple_percent: parseFloat(row.dead_tuple_percent || 0).toFixed(2)
+        dead_tuple_percent: parseFloat(row.dead_tuple_percent || 0).toFixed(2),
       }));
     } catch (error: any) {
       throw new Error(`Erreur lors de l'analyse VACUUM: ${error.message}`);
@@ -311,7 +318,9 @@ export class DBOptimizer {
       const result = await this.pool.query(query);
       return result.rows;
     } catch (error: any) {
-      throw new Error(`Erreur lors de l'analyse des requÃªtes: ${error.message}`);
+      throw new Error(
+        `Erreur lors de l'analyse des requÃªtes: ${error.message}`,
+      );
     }
   }
 
@@ -320,69 +329,87 @@ export class DBOptimizer {
     try {
       const report = [];
 
-      report.push('# ðŸ“Š Rapport d\'Optimisation PostgreSQL\n');
-      report.push(`*GÃ©nÃ©rÃ© le ${new Date().toLocaleString('fr-FR')}*\n`);
+      report.push("# ðŸ“Š Rapport d'Optimisation PostgreSQL\n");
+      report.push(`*GÃ©nÃ©rÃ© le ${new Date().toLocaleString("fr-FR")}*\n`);
 
       // 1. Cache Hit Ratios
       const cacheStats = await this.getCacheHitRatios();
-      report.push('## ðŸŽ¯ Performance du Cache');
-      report.push(`- **Cache tables**: ${((cacheStats.heap_ratio || 0) * 100).toFixed(2)}%`);
-      report.push(`- **Cache index**: ${((cacheStats.idx_ratio || 0) * 100).toFixed(2)}%`);
+      report.push("## ðŸŽ¯ Performance du Cache");
+      report.push(
+        `- **Cache tables**: ${((cacheStats.heap_ratio || 0) * 100).toFixed(2)}%`,
+      );
+      report.push(
+        `- **Cache index**: ${((cacheStats.idx_ratio || 0) * 100).toFixed(2)}%`,
+      );
 
       if ((cacheStats.heap_ratio || 0) < 0.95) {
-        report.push('âš ï¸  **Recommandation**: Augmenter shared_buffers pour amÃ©liorer le cache hit ratio');
+        report.push(
+          "âš ï¸  **Recommandation**: Augmenter shared_buffers pour amÃ©liorer le cache hit ratio",
+        );
       }
-      report.push('');
+      report.push("");
 
       // 2. Tables nÃ©cessitant un VACUUM
       const vacuumTables = await this.getTablesNeedingVacuum();
       if (vacuumTables.length > 0) {
-        report.push('## ðŸ§¹ Tables nÃ©cessitant un VACUUM');
-        vacuumTables.slice(0, 5).forEach(table => {
-          report.push(`- **${table.tablename}**: ${table.dead_tuple_percent}% de tuples morts (${table.table_size})`);
+        report.push("## ðŸ§¹ Tables nÃ©cessitant un VACUUM");
+        vacuumTables.slice(0, 5).forEach((table) => {
+          report.push(
+            `- **${table.tablename}**: ${table.dead_tuple_percent}% de tuples morts (${table.table_size})`,
+          );
         });
-        report.push('');
+        report.push("");
       }
 
       // 3. Index non utilisÃ©s
       const unusedIndexes = await this.analyzeIndexUsage();
-      const unused = unusedIndexes.filter(idx => idx.usage === 0);
+      const unused = unusedIndexes.filter((idx) => idx.usage === 0);
       if (unused.length > 0) {
-        report.push('## ðŸ—‘ï¸  Index non utilisÃ©s');
-        unused.slice(0, 3).forEach(idx => {
-          report.push(`- **${idx.indexname}** sur ${idx.tablename} (${idx.size})`);
+        report.push("## ðŸ—‘ï¸  Index non utilisÃ©s");
+        unused.slice(0, 3).forEach((idx) => {
+          report.push(
+            `- **${idx.indexname}** sur ${idx.tablename} (${idx.size})`,
+          );
         });
-        report.push('ðŸ’¡ **Action**: ConsidÃ©rez supprimer ces index pour amÃ©liorer les performances d\'Ã©criture');
-        report.push('');
+        report.push(
+          "ðŸ’¡ **Action**: ConsidÃ©rez supprimer ces index pour amÃ©liorer les performances d'Ã©criture",
+        );
+        report.push("");
       }
 
       // 4. RequÃªtes lentes (si pg_stat_statements est activÃ©)
       try {
         const slowQueries = await this.getSlowQueries(3);
         if (slowQueries.length > 0) {
-          report.push('## ðŸ Œ RequÃªtes lentes');
+          report.push("## ðŸ Œ RequÃªtes lentes");
           slowQueries.forEach((query, index) => {
-            report.push(`${index + 1}. **Temps moyen**: ${query.duration.toFixed(2)}ms (${query.calls} appels)`);
-            report.push(`   \`\`\`sql\n${query.query.substring(0, 100)}...\n   \`\`\``);
+            report.push(
+              `${index + 1}. **Temps moyen**: ${query.duration.toFixed(2)}ms (${query.calls} appels)`,
+            );
+            report.push(
+              `   \`\`\`sql\n${query.query.substring(0, 100)}...\n   \`\`\``,
+            );
           });
-          report.push('');
+          report.push("");
         }
       } catch {
         // pg_stat_statements n'est peut-Ãªtre pas activÃ©
-        report.push('## ðŸ“ˆ Note');
-        report.push('Activer `pg_stat_statements` pour analyser les requÃªtes lentes');
-        report.push('');
+        report.push("## ðŸ“ˆ Note");
+        report.push(
+          "Activer `pg_stat_statements` pour analyser les requÃªtes lentes",
+        );
+        report.push("");
       }
 
       // 5. Suggestions d'index
       const missingIndexes = await this.suggestMissingIndexes();
       if (missingIndexes.length > 0) {
-        report.push('## ðŸ’¡ Suggestions d\'index');
-        missingIndexes.slice(0, 3).forEach(idx => {
+        report.push("## ðŸ’¡ Suggestions d'index");
+        missingIndexes.slice(0, 3).forEach((idx) => {
           report.push(`- **${idx.table}** (${idx.potential_impact} impact)`);
           report.push(`  ${idx.suggested_index}`);
         });
-        report.push('');
+        report.push("");
       }
 
       // 6. RequÃªtes actives et locks
@@ -390,17 +417,19 @@ export class DBOptimizer {
       const activeLocks = await this.getActiveLocks();
 
       if (activeQueries.length > 0 || activeLocks.length > 0) {
-        report.push('## âš¡ ActivitÃ© actuelle');
+        report.push("## âš¡ ActivitÃ© actuelle");
         if (activeQueries.length > 0) {
-          report.push(`- **${activeQueries.length} requÃªte(s) en cours d'exÃ©cution**`);
+          report.push(
+            `- **${activeQueries.length} requÃªte(s) en cours d'exÃ©cution**`,
+          );
         }
         if (activeLocks.length > 0) {
           report.push(`- **${activeLocks.length} lock(s) actif(s)**`);
         }
-        report.push('');
+        report.push("");
       }
 
-      return report.join('\n');
+      return report.join("\n");
     } catch (error: any) {
       return `â Œ Erreur lors de la gÃ©nÃ©ration du rapport: ${error.message}`;
     }

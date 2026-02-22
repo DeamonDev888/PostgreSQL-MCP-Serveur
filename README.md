@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://cdn.jsdelivr.net/npm/overmind-postgres-mcp@1.0.9/assets/postgres_mcp_hero.png" alt="Overmind PostgreSQL MCP Hero" width="800">
+  <img src="assets/institutional_grade_rag.jpg" alt="PostgreSQL MCP - Institutional Grade RAG" width="800">
 </p>
 
 <br>
@@ -23,6 +23,10 @@
 </p>
 
 Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une bibliothèque TypeScript pour l'intelligence sémantique.
+
+- **🧠 Mémoire Haute-Performance (4096D)** : Système RAG intégré via PostgreSQL + pgvector supportant les embeddings SOTA (Qwen 8B).
+- **🛡️ Mémoire Ségréguée** : Chaque agent peut posséder ses propres souvenirs isolés tout en ayant accès au socle de connaissances global.
+- **🤖 Navigation Autonome** : L'agent interagit naturellement avec la base de données via le modèle d'embedding par défaut, sans avoir besoin d'écrire des requêtes SQL complexes (sauf cas spécifique).
 
 ## 🚀 Démarrage Rapide (Usage MCP)
 
