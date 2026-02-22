@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { Pool } from 'pg';
-import Logger from '../utils/logger.js';
-import { embeddingService } from './embeddingService.js';
-import { HybridSearchService } from './hybridSearchService.js';
+import { Pool } from "pg";
+import Logger from "../utils/logger.js";
+import { embeddingService } from "./embeddingService.js";
+import { HybridSearchService } from "./hybridSearchService.js";
 
 /**
  * Service de recherche intelligent
@@ -25,11 +25,11 @@ export class IntelligentSearchService {
     query: string,
     options: {
       tableName?: string;
-      mode?: 'auto' | 'hybrid' | 'vector' | 'text';
+      mode?: "auto" | "hybrid" | "vector" | "text";
       topK?: number;
       enableCache?: boolean;
       contentColumn?: string;
-    } = {}
+    } = {},
   ): Promise<{
     results: any[];
     metadata: {
@@ -42,11 +42,11 @@ export class IntelligentSearchService {
     };
   }> {
     const {
-      tableName = 'documents',
-      mode = 'auto',
+      tableName = "documents",
+      mode = "auto",
       topK = 10,
       enableCache = true,
-      contentColumn = 'content'
+      contentColumn = "content",
     } = options;
 
     const startTime = Date.now();
@@ -54,7 +54,9 @@ export class IntelligentSearchService {
     try {
       // ÉTAPE 1: Détecter le mode optimal
       const detectedMode = this.detectSearchMode(query, mode);
-      Logger.debug(`🎯 Mode détecté: ${detectedMode} pour: "${query.substring(0, 50)}..."`);
+      Logger.debug(
+        `🎯 Mode détecté: ${detectedMode} pour: "${query.substring(0, 50)}..."`,
+      );
 
       // ÉTAPE 2: Exécuter la recherche selon le mode
       let results: any[] = [];
@@ -64,44 +66,54 @@ export class IntelligentSearchService {
         actualMode: detectedMode,
         executionTime: 0,
         embeddingGenerated: false,
-        cacheHit: false
+        cacheHit: false,
       };
 
       switch (detectedMode) {
-        case 'text': {
-          const textResult = await this.hybridSearch.textSearch(query, tableName, contentColumn, topK);
+        case "text": {
+          const textResult = await this.hybridSearch.textSearch(
+            query,
+            tableName,
+            contentColumn,
+            topK,
+          );
           results = textResult.results;
           metadata = { ...metadata, ...textResult.metadata };
           break;
         }
 
-        case 'vector': {
-          const vectorResult = await this.performVectorSearch(query, tableName, topK, enableCache);
+        case "vector": {
+          const vectorResult = await this.performVectorSearch(
+            query,
+            tableName,
+            topK,
+            enableCache,
+          );
           results = vectorResult.results;
-          // Si on est en mode vector, on n'a pas forcément accès à contentColumn dans le SELECT * 
+          // Si on est en mode vector, on n'a pas forcément accès à contentColumn dans le SELECT *
           // sauf si c'est géré par "*" ou si l'utilisateur le spécifie dans RAG.
           metadata = {
             ...metadata,
             ...vectorResult.metadata,
             embeddingGenerated: true,
-            cacheHit: vectorResult.fromCache
+            cacheHit: vectorResult.fromCache,
           };
           break;
         }
 
-        case 'hybrid': {
+        case "hybrid": {
           const hybridResult = await this.hybridSearch.search(query, {
             tableName,
             topK,
             hybridMode: true,
             useCache: enableCache,
-            contentColumn
+            contentColumn,
           });
           results = hybridResult.results;
           metadata = {
             ...metadata,
             ...hybridResult.metadata,
-            embeddingGenerated: true
+            embeddingGenerated: true,
           };
           break;
         }
@@ -112,15 +124,16 @@ export class IntelligentSearchService {
 
       metadata.executionTime = Date.now() - startTime;
 
-      Logger.info(`✅ Recherche ${detectedMode} terminée: ${results.length} résultats en ${metadata.executionTime}ms`);
+      Logger.info(
+        `✅ Recherche ${detectedMode} terminée: ${results.length} résultats en ${metadata.executionTime}ms`,
+      );
 
       return {
         results,
-        metadata
+        metadata,
       };
-
     } catch (error: any) {
-      Logger.error('❌ Erreur recherche intelligente:', error.message);
+      Logger.error("❌ Erreur recherche intelligente:", error.message);
       throw new Error(`Échec de recherche: ${error.message}`);
     }
   }
@@ -132,39 +145,41 @@ export class IntelligentSearchService {
     const query = userQuery.toLowerCase().trim();
 
     // Mode explicite demandé
-    if (requestedMode !== 'auto') {
+    if (requestedMode !== "auto") {
       return requestedMode;
     }
 
     // Mots-clés de test/debug - rediriger vers pgvector_search avec useRandomVector
     if (
-      query.startsWith('test:') ||
-      query.startsWith('debug:') ||
-      query.startsWith('random:') ||
-      query.includes('performance') ||
-      query.includes('benchmark')
+      query.startsWith("test:") ||
+      query.startsWith("debug:") ||
+      query.startsWith("random:") ||
+      query.includes("performance") ||
+      query.includes("benchmark")
     ) {
-      Logger.info('💡 Utilisez pgvector_search avec useRandomVector: true pour les tests');
-      return 'text'; // Mode par défaut pour les tests dans intelligent_search
+      Logger.info(
+        "💡 Utilisez pgvector_search avec useRandomVector: true pour les tests",
+      );
+      return "text"; // Mode par défaut pour les tests dans intelligent_search
     }
 
     // Requête très courte - full-text suffisant
-    if (query.split(' ').length <= 2) {
-      return 'text';
+    if (query.split(" ").length <= 2) {
+      return "text";
     }
 
     // Requête complexe - hybride recommandé
     if (
-      query.includes('comment') ||
-      query.includes('pourquoi') ||
-      query.includes('quelle est') ||
+      query.includes("comment") ||
+      query.includes("pourquoi") ||
+      query.includes("quelle est") ||
       query.length > 50
     ) {
-      return 'hybrid';
+      return "hybrid";
     }
 
     // Par défaut: vecteur
-    return 'vector';
+    return "vector";
   }
 
   /**
@@ -172,7 +187,7 @@ export class IntelligentSearchService {
    */
   private async performRandomSearch(
     tableName: string,
-    topK: number
+    topK: number,
   ): Promise<any[]> {
     const client = await this.pool.connect();
 
@@ -180,12 +195,14 @@ export class IntelligentSearchService {
       // Générer un vecteur aléatoire 768D
       const randomVector = [];
       for (let i = 0; i < 768; i++) {
-        randomVector.push((Math.random() * 2) - 1);
+        randomVector.push(Math.random() * 2 - 1);
       }
 
       // Normaliser
-      const magnitude = Math.sqrt(randomVector.reduce((sum, val) => sum + val * val, 0));
-      const normalizedVector = randomVector.map(val => val / magnitude);
+      const magnitude = Math.sqrt(
+        randomVector.reduce((sum, val) => sum + val * val, 0),
+      );
+      const normalizedVector = randomVector.map((val) => val / magnitude);
 
       // Recherche
       const results = await client.query(
@@ -195,12 +212,11 @@ export class IntelligentSearchService {
         ORDER BY embedding <=> $1::vector
         LIMIT $2
         `,
-        [`[${normalizedVector.join(',')}]`, topK]
+        [`[${normalizedVector.join(",")}]`, topK],
       );
 
-      Logger.info('🎲 Recherche aléatoire effectuée');
+      Logger.info("🎲 Recherche aléatoire effectuée");
       return results.rows;
-
     } finally {
       client.release();
     }
@@ -213,13 +229,15 @@ export class IntelligentSearchService {
     query: string,
     tableName: string,
     topK: number,
-    useCache: boolean
+    useCache: boolean,
   ): Promise<{ results: any[]; metadata: any; fromCache: boolean }> {
     const client = await this.pool.connect();
 
     try {
       // Générer l'embedding
-      const embedding = await embeddingService.generateEmbedding(query, { useCache });
+      const embedding = await embeddingService.generateEmbedding(query, {
+        useCache,
+      });
 
       // Vérifier si vient du cache
       const fromCache = false; // Note: Cette vérification pourrait être améliorée avec un cache LRU
@@ -232,18 +250,17 @@ export class IntelligentSearchService {
         ORDER BY embedding <=> $1::vector
         LIMIT $2
         `,
-        [`[${embedding.join(',')}]`, topK]
+        [`[${embedding.join(",")}]`, topK],
       );
 
       return {
         results: results.rows,
         metadata: {
           embeddingDimensions: embedding.length,
-          queryLength: query.length
+          queryLength: query.length,
         },
-        fromCache
+        fromCache,
       };
-
     } finally {
       client.release();
     }
@@ -258,45 +275,48 @@ export class IntelligentSearchService {
     reasoning: string[];
     suggestions: string[];
   }> {
-    const mode = this.detectSearchMode(query, 'auto');
+    const mode = this.detectSearchMode(query, "auto");
     const reasoning: string[] = [];
     const suggestions: string[] = [];
 
     // Analyser la requête
-    const words = query.split(' ').length;
+    const words = query.split(" ").length;
     const length = query.length;
 
     if (words <= 2) {
-      reasoning.push('Requête courte - full-text suffira');
+      reasoning.push("Requête courte - full-text suffira");
       suggestions.push('Utilisez le mode "text" pour plus de rapidité');
     }
 
-    if (query.includes('comment') || query.includes('pourquoi')) {
-      reasoning.push('Question complexe - vecteur recommandé');
+    if (query.includes("comment") || query.includes("pourquoi")) {
+      reasoning.push("Question complexe - vecteur recommandé");
       suggestions.push('Mode "hybrid" offrira les meilleurs résultats');
     }
 
-    if (query.startsWith('test:') || query.startsWith('debug:')) {
-      reasoning.push('Requête de test détectée');
-      suggestions.push('Utilisez pgvector_search avec useRandomVector: true pour les tests');
+    if (query.startsWith("test:") || query.startsWith("debug:")) {
+      reasoning.push("Requête de test détectée");
+      suggestions.push(
+        "Utilisez pgvector_search avec useRandomVector: true pour les tests",
+      );
     }
 
     if (length > 100) {
-      reasoning.push('Requête longue - vecteur plus précis');
+      reasoning.push("Requête longue - vecteur plus précis");
       suggestions.push('Mode "hybrid" pour combiner vitesse et précision');
     }
 
     // Calculer la confiance
     let confidence = 0.5;
-    if (mode === 'text' && words <= 2) confidence = 0.8;
-    if (mode === 'hybrid' && (query.includes('comment') || length > 50)) confidence = 0.9;
-    if (mode === 'vector' && length > 20 && words > 2) confidence = 0.7;
+    if (mode === "text" && words <= 2) confidence = 0.8;
+    if (mode === "hybrid" && (query.includes("comment") || length > 50))
+      confidence = 0.9;
+    if (mode === "vector" && length > 20 && words > 2) confidence = 0.7;
 
     return {
       mode,
       confidence,
       reasoning,
-      suggestions
+      suggestions,
     };
   }
 
@@ -306,15 +326,17 @@ export class IntelligentSearchService {
   async benchmark(
     testQueries: string[],
     tableName: string,
-    iterations: number = 3
+    iterations: number = 3,
   ): Promise<{
     text: { avgTime: number; successRate: number };
     vector: { avgTime: number; successRate: number };
     hybrid: { avgTime: number; successRate: number };
   }> {
-    Logger.info(`🧪 Benchmark sur ${testQueries.length} requêtes (${iterations} itérations)...`);
+    Logger.info(
+      `🧪 Benchmark sur ${testQueries.length} requêtes (${iterations} itérations)...`,
+    );
 
-    const modes = ['text', 'vector', 'hybrid'];
+    const modes = ["text", "vector", "hybrid"];
     const results: any = {};
 
     for (const mode of modes) {
@@ -336,10 +358,12 @@ export class IntelligentSearchService {
 
       results[mode] = {
         avgTime: totalTime / (testQueries.length * iterations),
-        successRate: (successCount / (testQueries.length * iterations)) * 100
+        successRate: (successCount / (testQueries.length * iterations)) * 100,
       };
 
-      Logger.info(`✅ ${mode}: ${results[mode].avgTime.toFixed(2)}ms avg, ${results[mode].successRate.toFixed(1)}% success`);
+      Logger.info(
+        `✅ ${mode}: ${results[mode].avgTime.toFixed(2)}ms avg, ${results[mode].successRate.toFixed(1)}% success`,
+      );
     }
 
     return results;
@@ -351,9 +375,14 @@ export class IntelligentSearchService {
   async getSuggestions(
     partialQuery: string,
     tableName: string,
-    contentColumn: string = 'content',
-    limit: number = 5
+    contentColumn: string = "content",
+    limit: number = 5,
   ): Promise<string[]> {
-    return this.hybridSearch.getSuggestions(partialQuery, tableName, contentColumn, limit);
+    return this.hybridSearch.getSuggestions(
+      partialQuery,
+      tableName,
+      contentColumn,
+      limit,
+    );
   }
 }

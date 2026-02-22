@@ -1,13 +1,16 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 class Logger {
   private logDir: string;
   private logFile: string;
 
   constructor() {
-    this.logDir = path.join(process.cwd(), 'logs');
-    this.logFile = path.join(this.logDir, `postgresql-mcp-${new Date().toISOString().split('T')[0]}.log`);
+    this.logDir = path.join(process.cwd(), "logs");
+    this.logFile = path.join(
+      this.logDir,
+      `postgresql-mcp-${new Date().toISOString().split("T")[0]}.log`,
+    );
 
     // Créer le dossier de logs s'il n'existe pas
     if (!fs.existsSync(this.logDir)) {
@@ -17,9 +20,11 @@ class Logger {
 
   private formatMessage(level: string, ...args: any[]): string {
     const timestamp = new Date().toISOString();
-    const message = args.map(arg =>
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
+    const message = args
+      .map((arg) =>
+        typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg),
+      )
+      .join(" ");
 
     return `[${timestamp}] [${level}] ${message}`;
   }
@@ -28,7 +33,7 @@ class Logger {
     const message = this.formatMessage(level, ...args);
 
     // Écrire dans le fichier de log
-    fs.appendFileSync(this.logFile, message + '\n');
+    fs.appendFileSync(this.logFile, message + "\n");
 
     // Afficher dans stderr pour ne pas interférer avec MCP
     // console.error(message);
@@ -39,16 +44,16 @@ class Logger {
   }
 
   warn(...args: any[]): void {
-    this.writeLog('WARN', ...args);
+    this.writeLog("WARN", ...args);
   }
 
   error(...args: any[]): void {
-    this.writeLog('ERROR', ...args);
+    this.writeLog("ERROR", ...args);
   }
 
   debug(...args: any[]): void {
-    if (process.env.NODE_ENV === 'development') {
-      this.writeLog('DEBUG', ...args);
+    if (process.env.NODE_ENV === "development") {
+      this.writeLog("DEBUG", ...args);
     }
   }
 }

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { FastMCP } from 'fastmcp';
-import { z } from 'zod';
-import { Pool } from 'pg';
-import Logger from '../utils/logger.js';
-import { IntelligentSearchService } from '../services/intelligentSearchService.js';
+import { FastMCP } from "fastmcp";
+import { z } from "zod";
+import { Pool } from "pg";
+import Logger from "../utils/logger.js";
+import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 
 /**
  * Outil MCP de recherche intelligente
@@ -28,7 +28,7 @@ export class IntelligentSearchTools {
     this.benchmarkSearch();
     this.getSuggestions();
 
-    Logger.info('✅ Outils de recherche intelligente enregistrés (5 outils)');
+    Logger.info("✅ Outils de recherche intelligente enregistrés (5 outils)");
   }
 
   /**
@@ -36,14 +36,23 @@ export class IntelligentSearchTools {
    */
   private intelligentSearch(): void {
     this.server.addTool({
-      name: 'intelligent_search',
-      description: 'Recherche intelligente avec détection automatique du mode optimal',
+      name: "intelligent_search",
+      description:
+        "Recherche intelligente avec détection automatique du mode optimal",
       parameters: z.object({
-        query: z.string().describe('Requête de recherche'),
-        tableName: z.string().describe('Nom de la table'),
-        mode: z.enum(['auto', 'hybrid', 'vector', 'text']).optional().default('auto').describe('Mode de recherche (auto = automatique)'),
-        topK: z.number().optional().default(10).describe('Nombre de résultats'),
-        enableCache: z.boolean().optional().default(true).describe('Utiliser le cache d\'embeddings'),
+        query: z.string().describe("Requête de recherche"),
+        tableName: z.string().describe("Nom de la table"),
+        mode: z
+          .enum(["auto", "hybrid", "vector", "text"])
+          .optional()
+          .default("auto")
+          .describe("Mode de recherche (auto = automatique)"),
+        topK: z.number().optional().default(10).describe("Nombre de résultats"),
+        enableCache: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Utiliser le cache d'embeddings"),
       }),
       execute: async (args) => {
         try {
@@ -51,7 +60,7 @@ export class IntelligentSearchTools {
             tableName: args.tableName,
             mode: args.mode,
             topK: args.topK,
-            enableCache: args.enableCache
+            enableCache: args.enableCache,
           });
 
           // Formatter la sortie
@@ -62,7 +71,7 @@ export class IntelligentSearchTools {
           output += `📊 Résultats: ${result.results.length}\n`;
 
           if (result.metadata.embeddingGenerated) {
-            output += `🧠 Embedding: ${result.metadata.embeddingGenerated ? 'Oui' : 'Non'}\n`;
+            output += `🧠 Embedding: ${result.metadata.embeddingGenerated ? "Oui" : "Non"}\n`;
             if (result.metadata.cacheHit) {
               output += `📦 Cache: Hit ✅\n`;
             }
@@ -72,9 +81,13 @@ export class IntelligentSearchTools {
 
           if (result.results.length > 0) {
             result.results.forEach((row: any, index: number) => {
-              const similarity = row.similarity ? (row.similarity * 100).toFixed(1) : 'N/A';
+              const similarity = row.similarity
+                ? (row.similarity * 100).toFixed(1)
+                : "N/A";
               const rank = row.rank || index + 1;
-              const score = row.final_score ? (row.final_score * 100).toFixed(1) : similarity;
+              const score = row.final_score
+                ? (row.final_score * 100).toFixed(1)
+                : similarity;
 
               output += `**${rank}.** Score: ${score}%`;
               if (row.similarity && row.final_score) {
@@ -83,11 +96,13 @@ export class IntelligentSearchTools {
               output += `\n`;
 
               // Afficher le contenu (tronqué)
-              const content = row.content || row.title || JSON.stringify(row, null, 2);
-              if (content && typeof content === 'string') {
-                const displayContent = content.length > 200
-                  ? content.substring(0, 200) + '...'
-                  : content;
+              const content =
+                row.content || row.title || JSON.stringify(row, null, 2);
+              if (content && typeof content === "string") {
+                const displayContent =
+                  content.length > 200
+                    ? content.substring(0, 200) + "..."
+                    : content;
                 output += `   ${displayContent}\n\n`;
               }
             });
@@ -103,24 +118,23 @@ export class IntelligentSearchTools {
           output += `\n---\n`;
           output += `💡 **Mode ${result.metadata.actualMode}:**\n`;
           switch (result.metadata.actualMode) {
-            case 'random':
+            case "random":
               output += `Mode test activé - résultats aléatoires pour débogage\n`;
               break;
-            case 'text':
+            case "text":
               output += `Recherche full-text - rapide mais moins précise\n`;
               break;
-            case 'vector':
+            case "vector":
               output += `Recherche sémantique - précise mais plus lente\n`;
               break;
-            case 'hybrid':
+            case "hybrid":
               output += `Recherche hybride - meilleur des 2 mondes !\n`;
               break;
           }
 
           return output;
-
         } catch (error: any) {
-          Logger.error('❌ [intelligent_search]', error.message);
+          Logger.error("❌ [intelligent_search]", error.message);
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -132,20 +146,20 @@ export class IntelligentSearchTools {
    */
   private searchWithMode(): void {
     this.server.addTool({
-      name: 'search_with_mode',
-      description: 'Force un mode de recherche spécifique',
+      name: "search_with_mode",
+      description: "Force un mode de recherche spécifique",
       parameters: z.object({
-        query: z.string().describe('Requête de recherche'),
-        tableName: z.string().describe('Nom de la table'),
-        mode: z.enum(['text', 'vector', 'hybrid']).describe('Mode forcé'),
-        topK: z.number().optional().default(10).describe('Nombre de résultats'),
+        query: z.string().describe("Requête de recherche"),
+        tableName: z.string().describe("Nom de la table"),
+        mode: z.enum(["text", "vector", "hybrid"]).describe("Mode forcé"),
+        topK: z.number().optional().default(10).describe("Nombre de résultats"),
       }),
       execute: async (args) => {
         try {
           const result = await this.searchService.search(args.query, {
             tableName: args.tableName,
             mode: args.mode,
-            topK: args.topK
+            topK: args.topK,
           });
 
           let output = `🔍 **Recherche ${args.mode.toUpperCase()}**\n\n`;
@@ -155,18 +169,21 @@ export class IntelligentSearchTools {
           output += `📊 Résultats: ${result.results.length}\n\n`;
 
           result.results.forEach((row: any, index: number) => {
-            const similarity = row.similarity ? (row.similarity * 100).toFixed(1) : 'N/A';
+            const similarity = row.similarity
+              ? (row.similarity * 100).toFixed(1)
+              : "N/A";
             output += `**${index + 1}.** Similarité: ${similarity}%\n`;
             if (row.content) {
-              const content = row.content.substring(0, 150) + (row.content.length > 150 ? '...' : '');
+              const content =
+                row.content.substring(0, 150) +
+                (row.content.length > 150 ? "..." : "");
               output += `   ${content}\n\n`;
             }
           });
 
           return output;
-
         } catch (error: any) {
-          Logger.error('❌ [search_with_mode]', error.message);
+          Logger.error("❌ [search_with_mode]", error.message);
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -178,10 +195,10 @@ export class IntelligentSearchTools {
    */
   private analyzeQuery(): void {
     this.server.addTool({
-      name: 'analyze_query',
-      description: 'Analyse une requête et recommande le mode optimal',
+      name: "analyze_query",
+      description: "Analyse une requête et recommande le mode optimal",
       parameters: z.object({
-        query: z.string().describe('Requête à analyser'),
+        query: z.string().describe("Requête à analyser"),
       }),
       execute: async (args) => {
         try {
@@ -215,9 +232,8 @@ export class IntelligentSearchTools {
           output += `• **hybrid** - Combinaison text+vecteur (optimal)\n`;
 
           return output;
-
         } catch (error: any) {
-          Logger.error('❌ [analyze_query]', error.message);
+          Logger.error("❌ [analyze_query]", error.message);
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -229,19 +245,24 @@ export class IntelligentSearchTools {
    */
   private benchmarkSearch(): void {
     this.server.addTool({
-      name: 'benchmark_search',
-      description: 'Benchmark des performances des différents modes de recherche',
+      name: "benchmark_search",
+      description:
+        "Benchmark des performances des différents modes de recherche",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table à tester'),
-        testQueries: z.array(z.string()).describe('Liste de requêtes de test'),
-        iterations: z.number().optional().default(3).describe('Nombre d\'itérations'),
+        tableName: z.string().describe("Nom de la table à tester"),
+        testQueries: z.array(z.string()).describe("Liste de requêtes de test"),
+        iterations: z
+          .number()
+          .optional()
+          .default(3)
+          .describe("Nombre d'itérations"),
       }),
       execute: async (args) => {
         try {
           const results = await this.searchService.benchmark(
             args.testQueries,
             args.tableName,
-            args.iterations
+            args.iterations,
           );
 
           let output = `🧪 **Benchmark des Modes de Recherche**\n\n`;
@@ -257,7 +278,10 @@ export class IntelligentSearchTools {
 
           // Recommandation
           const fastest = Object.entries(results).reduce((a, b) =>
-            results[a[0] as keyof typeof results].avgTime < results[b[0] as keyof typeof results].avgTime ? a : b
+            results[a[0] as keyof typeof results].avgTime <
+            results[b[0] as keyof typeof results].avgTime
+              ? a
+              : b,
           )[0];
 
           output += `🏆 **Le plus rapide:** ${fastest}\n`;
@@ -276,9 +300,8 @@ export class IntelligentSearchTools {
           }
 
           return output;
-
         } catch (error: any) {
-          Logger.error('❌ [benchmark_search]', error.message);
+          Logger.error("❌ [benchmark_search]", error.message);
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -290,20 +313,24 @@ export class IntelligentSearchTools {
    */
   private getSuggestions(): void {
     this.server.addTool({
-      name: 'get_search_suggestions',
-      description: 'Obtenir des suggestions de requêtes',
+      name: "get_search_suggestions",
+      description: "Obtenir des suggestions de requêtes",
       parameters: z.object({
-        partialQuery: z.string().describe('Requête partielle'),
-        tableName: z.string().describe('Nom de la table'),
-        limit: z.number().optional().default(5).describe('Nombre de suggestions'),
+        partialQuery: z.string().describe("Requête partielle"),
+        tableName: z.string().describe("Nom de la table"),
+        limit: z
+          .number()
+          .optional()
+          .default(5)
+          .describe("Nombre de suggestions"),
       }),
       execute: async (args) => {
         try {
           const suggestions = await this.searchService.getSuggestions!(
             args.partialQuery,
             args.tableName,
-            'content',
-            args.limit
+            "content",
+            args.limit,
           );
 
           let output = `💡 **Suggestions de Requêtes**\n\n`;
@@ -320,9 +347,8 @@ export class IntelligentSearchTools {
           }
 
           return output;
-
         } catch (error: any) {
-          Logger.error('❌ [get_search_suggestions]', error.message);
+          Logger.error("❌ [get_search_suggestions]", error.message);
           return `❌ Erreur: ${error.message}`;
         }
       },
