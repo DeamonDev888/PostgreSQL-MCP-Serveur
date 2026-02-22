@@ -40,12 +40,12 @@ Les couleurs sont définies dans `styles.css` :
 
 ```css
 :root {
-    --neon-pink: #ff006e;
-    --neon-cyan: #00fff5;
-    --neon-purple: #b537f2;
-    --neon-blue: #3b82f6;
-    --neon-green: #00ff88;
-    --gradient-postgres: linear-gradient(135deg, #336791, #00ff88, #00fff5);
+  --neon-pink: #ff006e;
+  --neon-cyan: #00fff5;
+  --neon-purple: #b537f2;
+  --neon-blue: #3b82f6;
+  --neon-green: #00ff88;
+  --gradient-postgres: linear-gradient(135deg, #336791, #00ff88, #00fff5);
 }
 ```
 
@@ -99,6 +99,7 @@ Ouvrez `index.html` directement dans votre navigateur pour un aperçu local.
 ## 📊 Statistiques Animées
 
 Les statistiques dans la hero section s'animent au scroll :
+
 - 4096 Dimensions Mémoire
 - 100% Type-Safe
 - 8 Modèles Supportés
@@ -113,3 +114,5 @@ Les statistiques dans la hero section s'animent au scroll :
 ## 📝 Licence
 
 MIT
+
+<!-- Last Deploy: 2026-02-22T14:35:00 -->
