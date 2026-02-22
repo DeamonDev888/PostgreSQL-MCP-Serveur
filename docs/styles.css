@@ -233,6 +233,20 @@ nav {
     text-shadow: 0 0 20px var(--neon-cyan);
 }
 
+.nav-link-highlight {
+    color: var(--neon-green);
+    font-weight: 700;
+}
+
+.nav-link-highlight:hover {
+    color: var(--neon-green);
+    text-shadow: 0 0 20px var(--neon-green);
+}
+
+.nav-link-highlight i {
+    margin-right: 5px;
+}
+
 .nav-link:hover::before {
     width: 100%;
 }
