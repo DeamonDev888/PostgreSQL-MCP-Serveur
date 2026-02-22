@@ -4,6 +4,37 @@
   "description": "A comprehensive MCP server for PostgreSQL database interaction",
   "main": "dist/index.js",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/coreTools.d.ts",
+      "import": "./dist/tools/coreTools.js"
+    },
+    "./services/search": {
+      "types": "./dist/services/intelligentSearchService.d.ts",
+      "import": "./dist/services/intelligentSearchService.js"
+    },
+    "./services/embeddings": {
+      "types": "./dist/services/embeddingService.d.ts",
+      "import": "./dist/services/embeddingService.js"
+    },
+    "./utils/logger": {
+      "types": "./dist/utils/logger.d.ts",
+      "import": "./dist/utils/logger.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
