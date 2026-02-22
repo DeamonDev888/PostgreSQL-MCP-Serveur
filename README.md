@@ -14,6 +14,7 @@
   <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
   <a href="https://zod.dev/"><img src="https://img.shields.io/badge/Zod-F97316?style=for-the-badge&logo=zod&logoColor=white" alt="Zod"></a>
   <a href="https://discord.gg/4AR82phtBz"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://deamondev888.github.io/PostgreSQL-MCP-Serveur/"><img src="https://img.shields.io/badge/Documentation-Live-00ff88?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Doc"></a>
 </p>
 
 ---
