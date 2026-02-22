@@ -124,20 +124,13 @@ body {
 
 /* Header */
 header {
-    position: fixed;
-    top: 0;
-    left: 0;
+    position: relative;
     width: 100%;
     z-index: 1000;
     background: rgba(10, 10, 15, 0.8);
     backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(0, 255, 245, 0.1);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.1);
     transition: all 0.3s ease;
-}
-
-header.scrolled {
-    background: rgba(10, 10, 15, 0.95);
-    box-shadow: 0 10px 40px rgba(0, 255, 245, 0.1);
 }
 
 nav {
@@ -271,7 +264,7 @@ nav {
     min-height: 100vh;
     display: flex;
     align-items: center;
-    padding: 150px 0 100px;
+    padding: 80px 0 100px;
     position: relative;
 }
 
@@ -406,10 +399,10 @@ nav {
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    padding: 18px 40px;
+    padding: 12px 30px;
     border-radius: 50px;
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1rem;
     text-decoration: none;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -889,6 +882,134 @@ section {
     font-size: 0.9rem;
 }
 
+/* Advanced Examples Section */
+.advanced-examples {
+    background: rgba(15, 15, 25, 0.8);
+    position: relative;
+    overflow: hidden;
+}
+
+.advanced-examples::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(0, 255, 245, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 40px;
+}
+
+.advanced-card {
+    background: var(--dark-card);
+    border: 1px solid rgba(0, 255, 136, 0.15);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.advanced-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--gradient-postgres);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.advanced-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    border-color: var(--neon-green);
+    box-shadow: 0 25px 70px rgba(0, 255, 136, 0.3);
+}
+
+.advanced-card:hover::before {
+    opacity: 1;
+}
+
+.advanced-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 25px 30px;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.08) 0%, rgba(0, 255, 245, 0.05) 100%);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.1);
+    position: relative;
+}
+
+.advanced-header i {
+    font-size: 2rem;
+    color: var(--neon-green);
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 255, 136, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+}
+
+.advanced-header h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.advanced-tag {
+    padding: 6px 16px;
+    background: var(--gradient-postgres);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--dark-bg);
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+}
+
+.advanced-content {
+    padding: 25px 30px;
+}
+
+.advanced-content > p {
+    color: var(--text-secondary);
+    line-height: 1.8;
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+
+.advanced-card .code-container {
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 15px;
+}
+
+.advanced-card .code-container pre {
+    padding: 20px;
+    margin: 0;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.advanced-card .code-container code {
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
 /* Examples Section */
 .examples {
     background: rgba(20, 20, 30, 0.5);
@@ -1066,6 +1187,16 @@ footer {
 
     .hero-actions {
         flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .btn {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+        padding: 10px 20px;
+        font-size: 0.9rem;
     }
 
     .hero-stats {
