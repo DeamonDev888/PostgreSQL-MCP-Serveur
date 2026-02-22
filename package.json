@@ -1,8 +1,9 @@
 {
-  "name": "postgresql-mcp-server",
-  "version": "1.0.0",
+  "name": "overmind-postgres-mcp",
+  "version": "1.1.2",
   "description": "A comprehensive MCP server for PostgreSQL database interaction",
   "main": "dist/index.js",
+  "bin": "./dist/index.js",
   "type": "module",
   "exports": {
     ".": {
@@ -33,6 +34,7 @@
   "files": [
     "dist",
     "migrations",
+    "assets",
     "README.md"
   ],
   "scripts": {
@@ -63,6 +65,11 @@
   ],
   "author": "Deamon",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur.git"
+  },
+  "homepage": "https://discord.gg/4AR82phtBz",
   "dependencies": {
     "@xenova/transformers": "^2.14.0",
     "axios": "^1.13.2",

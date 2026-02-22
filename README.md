@@ -2,6 +2,10 @@
   <img src="https://readme-typing-svg.herokuapp.com?font=JetBrains+Mono&size=32&duration=6000&color=5865F2&center=true&vCenter=true&height=60&lines=%F0%9F%90%98+PostgreSQLMCP" alt="PostgreSQL MCP Server">
 </p>
 
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/npm/overmind-postgres-mcp@1.0.9/assets/postgres_mcp_hero.png" alt="Overmind PostgreSQL MCP Hero" width="800">
+</p>
+
 <br>
 
 <p align="center">
@@ -9,54 +13,78 @@
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
   <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
   <a href="https://zod.dev/"><img src="https://img.shields.io/badge/Zod-F97316?style=for-the-badge&logo=zod&logoColor=white" alt="Zod"></a>
-  <a href="#"><img src="https://img.shields.io/badge/FastMCP-000000?style=for-the-badge&logoColor=white" alt="FastMCP"></a>
+  <a href="https://discord.gg/4AR82phtBz"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 ---
 
 <p align="center">
-  <img src="assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
+  <img src="https://cdn.jsdelivr.net/npm/overmind-postgres-mcp@1.0.9/assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
 </p>
 
 Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une bibliothèque TypeScript pour l'intelligence sémantique.
 
-## 🚀 Démarrage Rapide
+## 🚀 Démarrage Rapide (Usage MCP)
 
-### Installation (NPM)
+La façon la plus simple d'utiliser ce serveur est de le configurer comme un serveur MCP dans votre client préféré (Claude_code, Antigravity, etc.).
 
-```bash
-pnpm add postgresql-mcp-server
+### 1. Configuration (.mcp.json)
+
+```json
+{
+  "mcpServers": {
+    "postgresql": {
+      "command": "npx",
+      "args": ["-y", "overmind-postgres-mcp"]
+    }
+  }
+}
 ```
 
-### Installation (Source)
+### 2. Variables d'Environnement (.env)
 
-```bash
-# Cloner le projet
-git clone https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur.git
-cd PostgreSQL-MCP-Serveur
+Le serveur charge automatiquement les fichiers `.env` pour sécuriser vos accès :
 
-# Installer les dépendances
-pnpm install
-
-# Compiler le projet
-pnpm build
-```
-
-## 🧠 Intelligence Sémantique (Hybrid Search)
-
-Le serveur supporte nativement **pgvector** et les embeddings (ex: **Qwen3 8B**) via OpenRouter ou OpenAI.
-
-### 🛠️ Usage en tant que Bibliothèque
-
-```typescript
-import { embedText } from "postgresql-mcp-server/services/embeddings";
-
-const { embedding, model } = await embedText("Votre texte ici");
+```env
+POSTGRES_URL=postgresql://user:pass@localhost:5432/db
+OPEN_ROUTER_API_KEY=sk-or-v1-...
 ```
 
 ---
 
-## ⚙️ Configuration & Sécurité
+## 📚 Usage Avancé (Bibliothèque TypeScript)
+
+Si vous développez votre propre orchestrateur (comme le projet **[overmind-mcp](https://www.npmjs.com/package/overmind-mcp)**), vous pouvez utiliser les services directement.
+
+### Installation
+
+```bash
+pnpm add overmind-postgres-mcp
+```
+
+### 1. Embeddings (Intelligence Sémantique)
+
+Générez des vecteurs haute qualité compatibles avec vos tables PostgreSQL.
+
+```typescript
+import { embedText } from "overmind-postgres-mcp/services/embeddings";
+
+const { embedding, model } = await embedText("Votre texte ici");
+```
+
+### 2. Recherche Hybride
+
+Exploitez la puissance de la recherche hybride native.
+
+```typescript
+import { IntelligentSearchService } from "overmind-postgres-mcp/services/search";
+
+const searchService = new IntelligentSearchService();
+const results = await searchService.hybridSearch({
+  query: "Comment configurer le serveur ?",
+  table: "documents",
+});
+```
 
 ### Zero-Config (.env)
 
