@@ -1,49 +1,76 @@
-# PostgreSQL MCP Server & Library
+<p align="center">
+  <img src="https://readme-typing-svg.herokuapp.com?font=JetBrains+Mono&size=32&duration=6000&color=5865F2&center=true&vCenter=true&height=60&lines=%F0%9F%90%98+PostgreSQLMCP" alt="PostgreSQL MCP Server">
+</p>
 
-A comprehensive Model Context Protocol (MCP) server for PostgreSQL interaction, which also doubles as an importable TypeScript library for intelligent search and embeddings.
+<br>
 
-## 🚀 Features
+<p align="center">
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
+  <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
+  <a href="https://zod.dev/"><img src="https://img.shields.io/badge/Zod-F97316?style=for-the-badge&logo=zod&logoColor=white" alt="Zod"></a>
+  <a href="#"><img src="https://img.shields.io/badge/FastMCP-000000?style=for-the-badge&logoColor=white" alt="FastMCP"></a>
+</p>
 
-- **MCP Tool Suite**: 8 high-level tools for database interaction (diagnose, explore, search, query, insert, etc.).
-- **Vector Intelligence**: Native support for `pgvector` with automatic embedding generation (OpenRouter/OpenAI).
-- **Intelligent Search**: Hybrid search (text + vector) with automatic mode detection.
-- **Physical Isolation**: Support for "Database-per-Agent" architecture when used with OverMind.
-- **Resilient**: Graceful fallbacks for missing extensions (vector, trgm).
+---
 
-## 📦 Installation
+<p align="center">
+  <img src="assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
+</p>
+
+Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une bibliothèque TypeScript pour l'intelligence sémantique.
+
+## 🚀 Démarrage Rapide
+
+### Installation (NPM)
 
 ```bash
-pnpm install postgresql-mcp-server
+pnpm add postgresql-mcp-server
 ```
 
-## 🛠️ Library Usage
+### Installation (Source)
 
-You can import services directly into your TypeScript project:
+```bash
+# Cloner le projet
+git clone https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur.git
+cd PostgreSQL-MCP-Serveur
+
+# Installer les dépendances
+pnpm install
+
+# Compiler le projet
+pnpm build
+```
+
+## 🧠 Intelligence Sémantique (Hybrid Search)
+
+Le serveur supporte nativement **pgvector** et les embeddings (ex: **Qwen3 8B**) via OpenRouter ou OpenAI.
+
+### 🛠️ Usage en tant que Bibliothèque
 
 ```typescript
 import { embedText } from "postgresql-mcp-server/services/embeddings";
 
-const { embedding, model } = await embedText("Hello world");
+const { embedding, model } = await embedText("Votre texte ici");
 ```
 
-### Configuration
+---
 
-The library uses environment variables or programmatic configuration:
+## ⚙️ Configuration & Sécurité
 
-- `OVERMIND_EMBEDDING_URL`: URL to your embedding API (e.g. OpenRouter).
-- `OVERMIND_EMBEDDING_KEY`: Your API key.
-- `OVERMIND_EMBEDDING_MODEL`: The model to use (default: `qwen/qwen3-embedding-8b`).
+### Zero-Config (.env)
 
-### Configuration Automatique (.env)
+Il est recommandé d'utiliser un fichier `.env` pour éviter d'exposer vos secrets dans les fichiers de configuration des hôtes (ex: Claude Desktop). Le serveur charge automatiquement les fichiers `.env` à sa racine ou dans le dossier d'exécution.
 
-Il est fortement recommandé de ne pas mettre vos mots de passe directement dans le fichier de configuration de Claude. Le serveur charge automatiquement les fichiers `.env` situés :
+```env
+POSTGRES_HOST=localhost
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=votre_mot_de_passe
+POSTGRES_DATABASE=votre_db
+OPEN_ROUTER_API_KEY=sk-or-v1-...
+```
 
-1. Dans le dossier racine du serveur.
-2. Dans votre dossier de travail actuel.
-
-### 🤖 Usage Serveur MCP
-
-Configurez votre hôte (ex: Claude Desktop ou OverMind) :
+### Configuration Serveur MCP (.mcp.json)
 
 ```json
 {
@@ -56,13 +83,48 @@ Configurez votre hôte (ex: Claude Desktop ou OverMind) :
 }
 ```
 
-> [!TIP]
-> Si un fichier `.env` est présent dans `/chemin/vers/postgresql-mcp-server/`, vous n'avez pas besoin de remplir la section `env` de la configuration !
+---
 
-### 🗄️ Migrations
+## 💡 Exemples d'Usage (Agent)
 
-Le dossier `migrations/` contient les scripts SQL nécessaires pour préparer votre base de données (notamment pour l'extension `pgvector`). Ces scripts ne sont pas exécutés automatiquement pour éviter toute altération accidentelle de vos données.
+### 1. Préparer une table pour Qwen (4096 dimensions)
 
-## 📜 License
+```typescript
+use_tool("manage_vectors", {
+  action: "create",
+  table: "knowledge_base",
+  dimensions: 4096,
+});
+```
+
+### 2. Insertion avec Auto-Embedding
+
+```typescript
+use_tool("insert", {
+  table: "knowledge_base",
+  data: { content: "Guide d'installation..." },
+  generateEmbedding: true,
+});
+```
+
+### 3. Recherche Hybride (RAG)
+
+```typescript
+use_tool("search", {
+  query: "Comment installer ?",
+  table: "knowledge_base",
+  mode: "hybrid",
+});
+```
+
+---
+
+## 🗄️ Migrations
+
+Le dossier `migrations/` contient les scripts SQL nécessaires pour configurer l'extension `pgvector` et optimiser vos tables pour les recherches haute performance.
+
+---
+
+## 📄 Licence
 
 MIT
