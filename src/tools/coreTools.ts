@@ -341,37 +341,8 @@ MCP_PG_VECTOR({
             }
 
             // Pour les SELECT
-            let output = `⚡ **Requête exécutée**\n\n`;
-            output += `⏱️ Durée: ${duration}ms\n`;
-            output += `📊 Résultats: ${result.rows.length} ligne(s)\n\n`;
-
-            if (result.rows.length > 0) {
-              const headers = Object.keys(result.rows[0]);
-              output += `| ${headers.join(' | ')} |\n`;
-              output += `|${headers.map(() => '---').join('|')}|\n`;
-
-              const displayRows = result.rows.slice(0, 20);
-              displayRows.forEach((row: any) => {
-                const values = headers.map((h: string) => {
-                  const val = row[h];
-                  if (val === null) return 'NULL';
-                  if (typeof val === 'object') return JSON.stringify(val).substring(0, 300);
-                  return String(val).substring(0, 300);
-                });
-                output += `| ${values.join(' | ')} |\n`;
-              });
-
-              if (result.rows.length > 20) {
-                output += `\n... et ${result.rows.length - 20} autres lignes`;
-              }
-            } else {
-              output += `ℹ️ Aucun résultat trouvé\n`;
-              output += `\n💡 **Suggestions:**\n`;
-              output += `- Vérifiez les critères de recherche\n`;
-              output += `- Utilisez explore({ type: 'tables' }) pour lister les tables disponibles`;
-            }
-
-            return output;
+            // 🛡️ MODIFICATION: Retourner JSON brut pour compatibilité agentic et éviter le bug des pipes '|'
+            return JSON.stringify(result.rows);
 
           } finally {
             await client.release();
@@ -437,6 +408,7 @@ MCP_PG_VECTOR({
         mode: z.enum(['auto', 'text', 'vector', 'hybrid']).default('auto').describe('Mode de recherche (auto = détecte automatiquement)'),
         topK: z.number().default(10).describe('Nombre de résultats'),
         embed: z.boolean().default(true).describe('Générer un embedding si nécessaire'),
+        contentColumn: z.string().default('content').describe('Colonne contenant le texte (pour mode hybrid/text)'),
       }),
       execute: async (args) => {
         try {
@@ -444,7 +416,8 @@ MCP_PG_VECTOR({
             tableName: args.table,
             mode: args.mode,
             topK: args.topK,
-            enableCache: args.embed
+            enableCache: args.embed,
+            contentColumn: args.contentColumn
           });
 
           let output = `🔍 **Recherche Intelligente**\n\n`;

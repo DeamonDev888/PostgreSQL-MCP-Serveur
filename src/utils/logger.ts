@@ -31,11 +31,11 @@ class Logger {
     fs.appendFileSync(this.logFile, message + '\n');
 
     // Afficher dans stderr pour ne pas interférer avec MCP
-    console.error(message);
+    // console.error(message);
   }
 
-  info(...args: any[]): void {
-    this.writeLog('INFO', ...args);
+  info(..._args: any[]): void {
+    // this.writeLog('INFO', ..._args);
   }
 
   warn(...args: any[]): void {

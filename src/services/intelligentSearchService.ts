@@ -28,6 +28,7 @@ export class IntelligentSearchService {
       mode?: 'auto' | 'hybrid' | 'vector' | 'text';
       topK?: number;
       enableCache?: boolean;
+      contentColumn?: string;
     } = {}
   ): Promise<{
     results: any[];
@@ -41,10 +42,11 @@ export class IntelligentSearchService {
     };
   }> {
     const {
-      tableName = 'documents', // Valeur par défaut pour les tests
+      tableName = 'documents',
       mode = 'auto',
       topK = 10,
-      enableCache = true
+      enableCache = true,
+      contentColumn = 'content'
     } = options;
 
     const startTime = Date.now();
@@ -67,7 +69,7 @@ export class IntelligentSearchService {
 
       switch (detectedMode) {
         case 'text': {
-          const textResult = await this.hybridSearch.textSearch(query, tableName, 'content', topK);
+          const textResult = await this.hybridSearch.textSearch(query, tableName, contentColumn, topK);
           results = textResult.results;
           metadata = { ...metadata, ...textResult.metadata };
           break;
@@ -76,6 +78,8 @@ export class IntelligentSearchService {
         case 'vector': {
           const vectorResult = await this.performVectorSearch(query, tableName, topK, enableCache);
           results = vectorResult.results;
+          // Si on est en mode vector, on n'a pas forcément accès à contentColumn dans le SELECT * 
+          // sauf si c'est géré par "*" ou si l'utilisateur le spécifie dans RAG.
           metadata = {
             ...metadata,
             ...vectorResult.metadata,
@@ -90,7 +94,8 @@ export class IntelligentSearchService {
             tableName,
             topK,
             hybridMode: true,
-            useCache: enableCache
+            useCache: enableCache,
+            contentColumn
           });
           results = hybridResult.results;
           metadata = {

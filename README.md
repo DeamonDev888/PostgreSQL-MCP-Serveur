@@ -2,6 +2,10 @@
   <img src="https://readme-typing-svg.herokuapp.com?font=JetBrains+Mono&size=32&duration=6000&color=5865F2&center=true&vCenter=true&height=60&lines=%F0%9F%90%98+PostgreSQLMCP" alt="PostgreSQL MCP Server">
 </p>
 
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/npm/overmind-postgres-mcp@1.0.9/assets/postgres_mcp_hero.png" alt="Overmind PostgreSQL MCP Hero" width="800">
+</p>
+
 <br>
 
 <p align="center">
@@ -9,103 +13,103 @@
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
   <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
   <a href="https://zod.dev/"><img src="https://img.shields.io/badge/Zod-F97316?style=for-the-badge&logo=zod&logoColor=white" alt="Zod"></a>
-  <a href="#"><img src="https://img.shields.io/badge/FastMCP-000000?style=for-the-badge&logoColor=white" alt="FastMCP"></a>
+  <a href="https://discord.gg/4AR82phtBz"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 ---
 
 <p align="center">
-  <img src="assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
+  <img src="https://cdn.jsdelivr.net/npm/overmind-postgres-mcp@1.0.9/assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
 </p>
 
-Un serveur MCP pour interagir avec PostgreSQL.
+Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une bibliothèque TypeScript pour l'intelligence sémantique.
 
-## 🚀 Démarrage Rapide
+## 🚀 Démarrage Rapide (Usage MCP)
 
-### Prérequis
+La façon la plus simple d'utiliser ce serveur est de le configurer comme un serveur MCP dans votre client préféré (Claude_code, Antigravity, etc.).
 
-- [Node.js](https://nodejs.org/) (v18 ou plus)
-- [pnpm](https://pnpm.io/) (v8 ou plus)
-- Une base de données PostgreSQL accessible
+### 1. Configuration (.mcp.json)
+
+```json
+{
+  "mcpServers": {
+    "postgresql": {
+      "command": "npx",
+      "args": ["-y", "overmind-postgres-mcp"]
+    }
+  }
+}
+```
+
+### 2. Variables d'Environnement (.env)
+
+Le serveur charge automatiquement les fichiers `.env` pour sécuriser vos accès :
+
+```env
+POSTGRES_URL=postgresql://user:pass@localhost:5432/db
+OPEN_ROUTER_API_KEY=sk-or-v1-...
+```
+
+---
+
+## 📚 Usage Avancé (Bibliothèque TypeScript)
+
+Si vous développez votre propre orchestrateur (comme le projet **[overmind-mcp](https://www.npmjs.com/package/overmind-mcp)**), vous pouvez utiliser les services directement.
 
 ### Installation
 
 ```bash
-# Cloner le projet
-git clone https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur.git
-cd PostgreSQL-MCP-Serveur
-
-# Installer les dépendances
-pnpm install
-
-# Configurer la base de données
-cp .env.example .env
-# Éditer .env avec vos paramètres PostgreSQL
-
-# Compiler le projet TypeScript
-pnpm build
-
+pnpm add overmind-postgres-mcp
 ```
 
-## ⚙️ Configuration
+### 1. Embeddings (Intelligence Sémantique)
 
-### .mcp.json
+Générez des vecteurs haute qualité compatibles avec vos tables PostgreSQL.
+
+```typescript
+import { embedText } from "overmind-postgres-mcp/services/embeddings";
+
+const { embedding, model } = await embedText("Votre texte ici");
+```
+
+### 2. Recherche Hybride
+
+Exploitez la puissance de la recherche hybride native.
+
+```typescript
+import { IntelligentSearchService } from "overmind-postgres-mcp/services/search";
+
+const searchService = new IntelligentSearchService();
+const results = await searchService.hybridSearch({
+  query: "Comment configurer le serveur ?",
+  table: "documents",
+});
+```
+
+### Zero-Config (.env)
+
+Il est recommandé d'utiliser un fichier `.env` pour éviter d'exposer vos secrets dans les fichiers de configuration des hôtes (ex: Claude Desktop). Le serveur charge automatiquement les fichiers `.env` à sa racine ou dans le dossier d'exécution.
+
+```env
+POSTGRES_HOST=localhost
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=votre_mot_de_passe
+POSTGRES_DATABASE=votre_db
+OPEN_ROUTER_API_KEY=sk-or-v1-...
+```
+
+### Configuration Serveur MCP (.mcp.json)
 
 ```json
 {
   "mcpServers": {
     "postgresql": {
       "command": "node",
-      "args": ["C:\\Path\\To\\PostgreSQL-MCP-Serveur\\dist\\index.js"]
+      "args": ["/chemin/vers/postgresql-mcp-server/dist/index.js"]
     }
   }
 }
 ```
-
-## 🛠️ Stack
-
-TypeScript • FastMCP • node-postgres • Zod • pnpm
-
-## 📄 Licence
-
-MIT
-
----
-
-## 🔌 Installation de pg_vector
-
-Pour utiliser la recherche vectorielle, installez l'extension pgvector
-avec docker sur Windows
-
-**Windows**
-
-```bash
-# Utiliser l'image officielle avec pgvector préinstallé
-docker pull pgvector/pgvector:pg16
-```
-
-**Linux/Mac**
-
-```bash
-sudo apt install postgresql-16-pgvector
-```
-
----
-
-## 🧠 Intelligence Sémantique (New v1.1)
-
-Le serveur supporte désormais nativement **Qwen3 Embedding 8B** via OpenRouter pour des recherches sémantiques haute précision.
-
-- **Modèle** : `qwen/qwen3-embedding-8b` (4096 dimensions).
-- **Mode Strict** : Pas de données simulées. Si l'API est absente, le service s'arrête.
-- **Configuration** :
-  Ajoutez votre clé API dans `.env` :
-  ```env
-  OPEN_ROUTER_API_KEY=sk-or-v1-...
-  ```
-- **Maintenance** :
-  Script de backfill inclus pour mettre à jour l'historique :
-  `npx tsx src/scripts/backfill_embeddings.ts`
 
 ---
 
@@ -117,38 +121,38 @@ Le serveur supporte désormais nativement **Qwen3 Embedding 8B** via OpenRouter 
 use_tool("manage_vectors", {
   action: "create",
   table: "knowledge_base",
-  dimensions: 4096, // Standard Qwen 8B
+  dimensions: 4096,
 });
 ```
 
-### 2. Sauvegarder un document (Auto-Embedding)
+### 2. Insertion avec Auto-Embedding
 
 ```typescript
 use_tool("insert", {
   table: "knowledge_base",
-  data: {
-    category: "documentation",
-    title: "Guide d'Installation",
-    content: "Pour installer le système, commencez par cloner le dépôt...",
-    author: "DevTeam",
-  },
-  generateEmbedding: true, // 🪄 Génère le vecteur 4096d automatiquement
+  data: { content: "Guide d'installation..." },
+  generateEmbedding: true,
 });
 ```
 
-### 3. Recherche de contexte (RAG)
+### 3. Recherche Hybride (RAG)
 
 ```typescript
 use_tool("search", {
-  query: "Comment installer le système ?",
+  query: "Comment installer ?",
   table: "knowledge_base",
   mode: "hybrid",
-  topK: 5,
 });
 ```
 
 ---
 
-## 📦 Outils Disponibles
+## 🗄️ Migrations
 
-Liste complète des 9 outils Core simplifiés : [Voir la documentation des outils](docs/liste_outils.md)
+Le dossier `migrations/` contient les scripts SQL nécessaires pour configurer l'extension `pgvector` et optimiser vos tables pour les recherches haute performance.
+
+---
+
+## 📄 Licence
+
+MIT
