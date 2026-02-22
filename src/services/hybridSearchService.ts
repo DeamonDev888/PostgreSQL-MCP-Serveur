@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { Pool } from 'pg';
-import Logger from '../utils/logger.js';
-import { embeddingService } from './embeddingService.js';
+import { Pool } from "pg";
+import Logger from "../utils/logger.js";
+import { embeddingService } from "./embeddingService.js";
 
 /**
  * Service de recherche hybride (Full-text + Vecteur)
@@ -31,12 +31,12 @@ export class HybridSearchService {
       textLimit?: number;
       hybridMode?: boolean;
       useCache?: boolean;
-    }
+    },
   ): Promise<{
     results: any[];
     metadata: {
       query: string;
-      mode: 'hybrid' | 'vector' | 'text';
+      mode: "hybrid" | "vector" | "text";
       executionTime: number;
       totalResults: number;
       embeddingTime?: number;
@@ -46,21 +46,21 @@ export class HybridSearchService {
   }> {
     const {
       tableName,
-      vectorColumn = 'embedding',
-      contentColumn = 'content',
+      vectorColumn = "embedding",
+      contentColumn = "content",
       topK = 10,
       textLimit = 100,
       hybridMode = true,
-      useCache = true
+      useCache = true,
     } = options;
 
     const startTime = Date.now();
     let results: any[] = [];
     let metadata: any = {
       query,
-      mode: 'hybrid' as const,
+      mode: "hybrid" as const,
       executionTime: 0,
-      totalResults: 0
+      totalResults: 0,
     };
 
     try {
@@ -73,11 +73,11 @@ export class HybridSearchService {
           contentColumn,
           topK,
           textLimit,
-          useCache
+          useCache,
         );
 
         results = hybridResults.results;
-        metadata = { ...metadata, ...hybridResults.metadata, mode: 'hybrid' };
+        metadata = { ...metadata, ...hybridResults.metadata, mode: "hybrid" };
       } else {
         // MODE VECTEUR SEUL
         const vectorResults = await this.performVectorSearch(
@@ -85,25 +85,26 @@ export class HybridSearchService {
           tableName,
           vectorColumn,
           topK,
-          useCache
+          useCache,
         );
 
         results = vectorResults.results;
-        metadata = { ...metadata, ...vectorResults.metadata, mode: 'vector' };
+        metadata = { ...metadata, ...vectorResults.metadata, mode: "vector" };
       }
 
       metadata.executionTime = Date.now() - startTime;
       metadata.totalResults = results.length;
 
-      Logger.info(`✅ Recherche terminée (${metadata.mode}): ${results.length} résultats en ${metadata.executionTime}ms`);
+      Logger.info(
+        `✅ Recherche terminée (${metadata.mode}): ${results.length} résultats en ${metadata.executionTime}ms`,
+      );
 
       return {
         results,
-        metadata
+        metadata,
       };
-
     } catch (error: any) {
-      Logger.error('❌ Erreur recherche hybride:', error.message);
+      Logger.error("❌ Erreur recherche hybride:", error.message);
       throw new Error(`Échec de recherche: ${error.message}`);
     }
   }
@@ -118,14 +119,14 @@ export class HybridSearchService {
     contentColumn: string,
     topK: number,
     textLimit: number,
-    useCache: boolean
+    useCache: boolean,
   ): Promise<{ results: any[]; metadata: any }> {
     // const startTime = Date.now();
     const client = await this.pool.connect();
 
     try {
       // ÉTAPE 1: Recherche full-text (filtrage rapide)
-      Logger.debug('🔍 Étape 1: Recherche full-text...');
+      Logger.debug("🔍 Étape 1: Recherche full-text...");
       const textStartTime = Date.now();
 
       const textResults = await client.query(
@@ -138,11 +139,13 @@ export class HybridSearchService {
         ORDER BY text_rank DESC
         LIMIT $2
         `,
-        [query, textLimit]
+        [query, textLimit],
       );
 
       const textSearchTime = Date.now() - textStartTime;
-      Logger.debug(`✅ Full-text: ${textResults.rows.length} résultats en ${textSearchTime}ms`);
+      Logger.debug(
+        `✅ Full-text: ${textResults.rows.length} résultats en ${textSearchTime}ms`,
+      );
 
       if (textResults.rows.length === 0) {
         return {
@@ -151,33 +154,39 @@ export class HybridSearchService {
             textSearchTime,
             vectorSearchTime: 0,
             embeddingTime: 0,
-            textResultsCount: 0
-          }
+            textResultsCount: 0,
+          },
         };
       }
 
       // ÉTAPE 2: Génération d'embedding de la requête
-      Logger.debug('🧠 Étape 2: Génération embedding...');
+      Logger.debug("🧠 Étape 2: Génération embedding...");
       const embeddingStartTime = Date.now();
-      const queryVector = await embeddingService.generateEmbedding(query, { useCache });
+      const queryVector = await embeddingService.generateEmbedding(query, {
+        useCache,
+      });
       const embeddingTime = Date.now() - embeddingStartTime;
       Logger.debug(`✅ Embedding: ${embeddingTime}ms`);
 
       // ÉTAPE 3: Recherche vectorielle dans les résultats filtrés
-      Logger.debug('🎯 Étape 3: Recherche vectorielle...');
+      Logger.debug("🎯 Étape 3: Recherche vectorielle...");
       const vectorStartTime = Date.now();
 
       const ids = textResults.rows.map((row: any) => row.id);
-      
+
       // Adaptation dynamique pour UUID ou Integer
       // Si enhanced_news (UUID), on cast le VALUES en UUID
       // Si autre table (Integer), on cast en Integer ou laisse par défaut
-      const isUUID = tableName === 'enhanced_news';
-      const idType = isUUID ? '::uuid' : '';
-      
+      const isUUID = tableName === "enhanced_news";
+      const idType = isUUID ? "::uuid" : "";
+
       // Construction de la clause VALUES pour le JOIN
       // Ex: ($2::uuid, 1), ($3::uuid, 2)...
-      const valuesClause = ids.map((id: any, index: number) => `($${index + 2}${idType}, ${index + 1})`).join(', ');
+      const valuesClause = ids
+        .map(
+          (id: any, index: number) => `($${index + 2}${idType}, ${index + 1})`,
+        )
+        .join(", ");
 
       const vectorQuery = `
         SELECT
@@ -193,25 +202,29 @@ export class HybridSearchService {
       `;
 
       const vectorResults = await client.query(vectorQuery, [
-        `[${queryVector.join(',')}]`,
+        `[${queryVector.join(",")}]`,
         ...ids,
-        topK
+        topK,
       ]);
 
       const vectorSearchTime = Date.now() - vectorStartTime;
-      Logger.debug(`✅ Vecteur: ${vectorResults.rows.length} résultats en ${vectorSearchTime}ms`);
+      Logger.debug(
+        `✅ Vecteur: ${vectorResults.rows.length} résultats en ${vectorSearchTime}ms`,
+      );
 
       // ÉTAPE 4: Fusion et classement
-      const mergedResults = vectorResults.rows.map((row: any, index: number) => {
+      const mergedResults = vectorResults.rows.map(
+        (row: any, index: number) => {
           // Score texte approximatif basé sur le rang (1er = 1.0, 2ème = 0.9...)
-          const textScore = 1.0 / (row.text_rank_index || 100); 
-          
+          const textScore = 1.0 / (row.text_rank_index || 100);
+
           return {
             ...row,
             rank: index + 1,
-            final_score: (row.similarity * 0.7) + (textScore * 0.3), // Score hybride
+            final_score: row.similarity * 0.7 + textScore * 0.3, // Score hybride
           };
-      });
+        },
+      );
 
       // Trier par score final
       mergedResults.sort((a: any, b: any) => b.final_score - a.final_score);
@@ -223,10 +236,9 @@ export class HybridSearchService {
           embeddingTime,
           vectorSearchTime,
           textResultsCount: textResults.rows.length,
-          vectorResultsCount: vectorResults.rows.length
-        }
+          vectorResultsCount: vectorResults.rows.length,
+        },
       };
-
     } finally {
       client.release();
     }
@@ -240,7 +252,7 @@ export class HybridSearchService {
     tableName: string,
     vectorColumn: string,
     topK: number,
-    useCache: boolean
+    useCache: boolean,
   ): Promise<{ results: any[]; metadata: any }> {
     // const startTime = Date.now();
     const client = await this.pool.connect();
@@ -248,7 +260,9 @@ export class HybridSearchService {
     try {
       // Générer l'embedding
       const embeddingStartTime = Date.now();
-      const queryVector = await embeddingService.generateEmbedding(query, { useCache });
+      const queryVector = await embeddingService.generateEmbedding(query, {
+        useCache,
+      });
       const embeddingTime = Date.now() - embeddingStartTime;
 
       // Recherche vectorielle
@@ -260,7 +274,7 @@ export class HybridSearchService {
         ORDER BY ${vectorColumn} <=> $1::vector
         LIMIT $2
         `,
-        [`[${queryVector.join(',')}]`, topK]
+        [`[${queryVector.join(",")}]`, topK],
       );
 
       const vectorSearchTime = Date.now() - vectorStartTime;
@@ -269,10 +283,9 @@ export class HybridSearchService {
         results: results.rows,
         metadata: {
           embeddingTime,
-          vectorSearchTime
-        }
+          vectorSearchTime,
+        },
       };
-
     } finally {
       client.release();
     }
@@ -284,8 +297,8 @@ export class HybridSearchService {
   async textSearch(
     query: string,
     tableName: string,
-    contentColumn: string = 'content',
-    topK: number = 10
+    contentColumn: string = "content",
+    topK: number = 10,
   ): Promise<{ results: any[]; metadata: any }> {
     const startTime = Date.now();
     const client = await this.pool.connect();
@@ -301,17 +314,16 @@ export class HybridSearchService {
         ORDER BY rank DESC
         LIMIT $2
         `,
-        [query, topK]
+        [query, topK],
       );
 
       return {
         results: results.rows,
         metadata: {
           executionTime: Date.now() - startTime,
-          totalResults: results.rows.length
-        }
+          totalResults: results.rows.length,
+        },
       };
-
     } finally {
       client.release();
     }
@@ -323,8 +335,8 @@ export class HybridSearchService {
   async getSuggestions(
     partialQuery: string,
     tableName: string,
-    contentColumn: string = 'content',
-    limit: number = 5
+    contentColumn: string = "content",
+    limit: number = 5,
   ): Promise<string[]> {
     const client = await this.pool.connect();
 
@@ -336,11 +348,10 @@ export class HybridSearchService {
         WHERE ${contentColumn} ILIKE $1
         LIMIT $2
         `,
-        [`%${partialQuery}%`, limit]
+        [`%${partialQuery}%`, limit],
       );
 
       return results.rows.map((row: any) => row[contentColumn]);
-
     } finally {
       client.release();
     }
