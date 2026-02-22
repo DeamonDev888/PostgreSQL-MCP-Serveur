@@ -1,8 +1,8 @@
-﻿import { FastMCP } from 'fastmcp';
-import { z } from 'zod';
-import { Pool } from 'pg';
-import Logger from '../utils/logger.js';
-import { embeddingService } from '../services/embeddingService.js';
+﻿import { FastMCP } from "fastmcp";
+import { z } from "zod";
+import { Pool } from "pg";
+import Logger from "../utils/logger.js";
+import { embeddingService } from "../services/embeddingService.js";
 
 /**
  * Module pg_vector pour PostgreSQL MCP Server
@@ -28,32 +28,35 @@ export class PGVectorTools {
   /**
    * Guide des modèles d'embedding standards avec leurs dimensions
    */
-  private static readonly EMBEDDING_MODELS_GUIDE: Record<number, { model: string; provider: string; description: string }> = {
+  private static readonly EMBEDDING_MODELS_GUIDE: Record<
+    number,
+    { model: string; provider: string; description: string }
+  > = {
     4096: {
-      model: 'qwen/qwen3-embedding-8b',
-      provider: 'OpenRouter / Alibaba',
-      description: 'Modèle SOTA haute performance (Défaut Système)'
+      model: "qwen/qwen3-embedding-8b",
+      provider: "OpenRouter / Alibaba",
+      description: "Modèle SOTA haute performance (Défaut Système)",
     },
     1536: {
-      model: 'text-embedding-ada-002',
-      provider: 'OpenAI',
-      description: 'Ancien standard OpenAI'
+      model: "text-embedding-ada-002",
+      provider: "OpenAI",
+      description: "Ancien standard OpenAI",
     },
     3072: {
-      model: 'text-embedding-3-large',
-      provider: 'OpenAI',
-      description: 'Modèle haute précision OpenAI'
+      model: "text-embedding-3-large",
+      provider: "OpenAI",
+      description: "Modèle haute précision OpenAI",
     },
     1024: {
-      model: 'text-embedding-3-small',
-      provider: 'OpenAI',
-      description: 'Modèle léger OpenAI'
+      model: "text-embedding-3-small",
+      provider: "OpenAI",
+      description: "Modèle léger OpenAI",
     },
     768: {
-      model: 'bert-base-uncased',
-      provider: 'HuggingFace',
-      description: 'Modèle open-source classique'
-    }
+      model: "bert-base-uncased",
+      provider: "HuggingFace",
+      description: "Modèle open-source classique",
+    },
   };
 
   /**
@@ -80,12 +83,15 @@ export class PGVectorTools {
   /**
    * Extrait les dimensions depuis un message d'erreur
    */
-  private extractDimensionsFromError(msg: string): { expected?: number; actual?: number } {
+  private extractDimensionsFromError(msg: string): {
+    expected?: number;
+    actual?: number;
+  } {
     // Pattern: "expected X dimensions, not Y" ou "expected X, got Y"
     const patterns = [
       /expected\s+(\d+)\s+dimensions?,\s+(?:not|got)\s+(\d+)/i,
       /(\d+)\s+dimensions?\s+expected.*?(\d+)\s+(?:provided|given|got)/i,
-      /vector\((\d+)\).*?(\d+)\s+(?:dimensions?|values?)/i
+      /vector\((\d+)\).*?(\d+)\s+(?:dimensions?|values?)/i,
     ];
 
     for (const pattern of patterns) {
@@ -105,44 +111,54 @@ export class PGVectorTools {
     const msgLower = msg.toLowerCase();
 
     // Mapping des erreurs courantes vers des solutions
-    const errorMap: Record<string, { explanation: string; suggestion: string; showGuide?: boolean }> = {
-      'column': {
-        explanation: 'La colonne spécifiée n\'existe pas dans la table',
-        suggestion: 'Vérifiez le nom de la colonne ou créez-la avec pgvector_create_column'
+    const errorMap: Record<
+      string,
+      { explanation: string; suggestion: string; showGuide?: boolean }
+    > = {
+      column: {
+        explanation: "La colonne spécifiée n'existe pas dans la table",
+        suggestion:
+          "Vérifiez le nom de la colonne ou créez-la avec pgvector_create_column",
       },
-      'relation': {
-        explanation: 'La table spécifiée n\'existe pas',
-        suggestion: 'Créez la table d\'abord avec pgvector_create_column (createTable:true)'
+      relation: {
+        explanation: "La table spécifiée n'existe pas",
+        suggestion:
+          "Créez la table d'abord avec pgvector_create_column (createTable:true)",
       },
-      'dimension': {
-        explanation: 'Les dimensions du vecteur ne correspondent pas à la colonne',
-        suggestion: 'Assurez-vous que votre modèle d\'embedding génère le bon nombre de dimensions',
-        showGuide: true
+      dimension: {
+        explanation:
+          "Les dimensions du vecteur ne correspondent pas à la colonne",
+        suggestion:
+          "Assurez-vous que votre modèle d'embedding génère le bon nombre de dimensions",
+        showGuide: true,
       },
-      'expected': {
-        explanation: 'Incompatibilité de dimensions entre le vecteur et la colonne',
-        suggestion: 'Le vecteur envoyé n\'a pas le même nombre de dimensions que la colonne',
-        showGuide: true
+      expected: {
+        explanation:
+          "Incompatibilité de dimensions entre le vecteur et la colonne",
+        suggestion:
+          "Le vecteur envoyé n'a pas le même nombre de dimensions que la colonne",
+        showGuide: true,
       },
-      'vector': {
-        explanation: 'Le format du vecteur est incorrect',
-        suggestion: 'Le vecteur doit être un tableau de nombres (ex: [0.1, 0.2, 0.3])'
+      vector: {
+        explanation: "Le format du vecteur est incorrect",
+        suggestion:
+          "Le vecteur doit être un tableau de nombres (ex: [0.1, 0.2, 0.3])",
       },
       'extension "vector" does not exist': {
-        explanation: 'L\'extension pgvector n\'est pas installée',
-        suggestion: 'Utilisez pgvector_check_extension avec autoInstall:true'
+        explanation: "L'extension pgvector n'est pas installée",
+        suggestion: "Utilisez pgvector_check_extension avec autoInstall:true",
       },
-      'value too long for type': {
-        explanation: 'Le vecteur a trop de dimensions pour la colonne',
-        suggestion: 'Vérifiez les dimensions de la colonne vectorielle',
-        showGuide: true
-      }
+      "value too long for type": {
+        explanation: "Le vecteur a trop de dimensions pour la colonne",
+        suggestion: "Vérifiez les dimensions de la colonne vectorielle",
+        showGuide: true,
+      },
     };
 
     // Chercher une correspondance
     let matched = false;
-    let explanation = '';
-    let suggestion = '';
+    let explanation = "";
+    let suggestion = "";
     let showGuide = false;
 
     for (const [key, value] of Object.entries(errorMap)) {
@@ -170,14 +186,16 @@ export class PGVectorTools {
           output += `\n📐 **Analyse des dimensions:**\n`;
           if (dims.expected) {
             output += `   • Attendu par la table: **${dims.expected}** dimensions\n`;
-            const expectedModel = PGVectorTools.EMBEDDING_MODELS_GUIDE[dims.expected];
+            const expectedModel =
+              PGVectorTools.EMBEDDING_MODELS_GUIDE[dims.expected];
             if (expectedModel) {
               output += `     → Compatible avec: ${expectedModel.model} (${expectedModel.provider})\n`;
             }
           }
           if (dims.actual) {
             output += `   • Reçu dans le vecteur: **${dims.actual}** dimensions\n`;
-            const actualModel = PGVectorTools.EMBEDDING_MODELS_GUIDE[dims.actual];
+            const actualModel =
+              PGVectorTools.EMBEDDING_MODELS_GUIDE[dims.actual];
             if (actualModel) {
               output += `     → Correspond à: ${actualModel.model} (${actualModel.provider})\n`;
             } else {
@@ -224,7 +242,7 @@ export class PGVectorTools {
     this.analyzeSlowQueries();
     this.pgvectorHelp();
 
-    Logger.info('✅ Outils pg_vector enregistrés (17 outils)');
+    Logger.info("✅ Outils pg_vector enregistrés (17 outils)");
   }
 
   // ========================================================================
@@ -232,10 +250,15 @@ export class PGVectorTools {
   // ========================================================================
   private checkExtension(): void {
     this.server.addTool({
-      name: 'pgvector_check_extension',
-      description: 'Vérifie si l\'extension pg_vector est installée et retourne sa version',
+      name: "pgvector_check_extension",
+      description:
+        "Vérifie si l'extension pg_vector est installée et retourne sa version",
       parameters: z.object({
-        autoInstall: z.boolean().optional().default(false).describe('Installer automatiquement l\'extension si absente'),
+        autoInstall: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Installer automatiquement l'extension si absente"),
       }),
       execute: async (args) => {
         try {
@@ -252,14 +275,16 @@ export class PGVectorTools {
 
           if (!isInstalled) {
             if (args.autoInstall) {
-              await client.query('CREATE EXTENSION IF NOT EXISTS vector');
-              Logger.info('✅ Extension pg_vector installée');
+              await client.query("CREATE EXTENSION IF NOT EXISTS vector");
+              Logger.info("✅ Extension pg_vector installée");
               await client.release();
-              return '✅ Extension pg_vector installée avec succès';
+              return "✅ Extension pg_vector installée avec succès";
             } else {
               await client.release();
-              return '❌ Extension pg_vector non installée. Utilisez autoInstall:true pour l\'installer automatiquement.\n\n' +
-                     '💡 Installation manuelle: CREATE EXTENSION vector;';
+              return (
+                "❌ Extension pg_vector non installée. Utilisez autoInstall:true pour l'installer automatiquement.\n\n" +
+                "💡 Installation manuelle: CREATE EXTENSION vector;"
+              );
             }
           }
 
@@ -275,12 +300,14 @@ export class PGVectorTools {
           const version = versionResult.rows[0].version;
           return `✅ Extension pg_vector installée (version: ${version})`;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_check_extension]', error.message);
+          Logger.error("❌ [pgvector_check_extension]", error.message);
 
           // Message d'erreur amélioré pour l'extension non disponible
-          if (error.message.includes('could not open extension control file') ||
-              error.message.includes('extension "vector" is not available') ||
-              error.message.includes('No such file or directory')) {
+          if (
+            error.message.includes("could not open extension control file") ||
+            error.message.includes('extension "vector" is not available') ||
+            error.message.includes("No such file or directory")
+          ) {
             return `❌ **Extension pg_vector non disponible sur ce serveur PostgreSQL**
 
 L'extension pg_vector doit être installée sur le serveur PostgreSQL avant de pouvoir l'utiliser.
@@ -315,7 +342,7 @@ CREATE EXTENSION vector;
 💡 Une fois pg_vector installé sur le serveur, relancez la commande avec autoInstall:true`;
           }
 
-          return this.formatError(error, 'Erreur');
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -326,17 +353,47 @@ CREATE EXTENSION vector;
   // ========================================================================
   private createVectorColumn(): void {
     this.server.addTool({
-      name: 'pgvector_create_column',
-      description: 'Ajoute une colonne vectorielle à une table existante ou crée une nouvelle table avec vecteurs',
+      name: "pgvector_create_column",
+      description:
+        "Ajoute une colonne vectorielle à une table existante ou crée une nouvelle table avec vecteurs",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        dimensions: z.number().optional().default(4096).describe('Dimension des vecteurs (4096 pour Qwen 8B)'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        createTable: z.boolean().optional().default(false).describe('Créer la table si elle n\'existe pas'),
-        idColumn: z.string().optional().default('id').describe('Nom de la colonne ID (si création de table)'),
-        idType: z.string().optional().default('SERIAL PRIMARY KEY').describe('Type de la colonne ID'),
-        additionalColumns: z.string().optional().describe('Colonnes supplémentaires (ex: content TEXT, metadata JSONB)'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        dimensions: z
+          .number()
+          .optional()
+          .default(4096)
+          .describe("Dimension des vecteurs (4096 pour Qwen 8B)"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        createTable: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Créer la table si elle n'existe pas"),
+        idColumn: z
+          .string()
+          .optional()
+          .default("id")
+          .describe("Nom de la colonne ID (si création de table)"),
+        idType: z
+          .string()
+          .optional()
+          .default("SERIAL PRIMARY KEY")
+          .describe("Type de la colonne ID"),
+        additionalColumns: z
+          .string()
+          .optional()
+          .describe(
+            "Colonnes supplémentaires (ex: content TEXT, metadata JSONB)",
+          ),
       }),
       execute: async (args) => {
         // ... (unchanged execution logic) ...
@@ -350,18 +407,21 @@ CREATE EXTENSION vector;
 
           if (!extCheck.rows[0].installed) {
             await client.release();
-            return '❌ L\'extension pg_vector n\'est pas installée. Utilisez pgvector_check_extension d\'abord.';
+            return "❌ L'extension pg_vector n'est pas installée. Utilisez pgvector_check_extension d'abord.";
           }
 
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           // Vérifier si la table existe
-          const tableCheck = await client.query(`
+          const tableCheck = await client.query(
+            `
             SELECT EXISTS(
               SELECT 1 FROM information_schema.tables
               WHERE table_schema = $1 AND table_name = $2
             ) as exists
-          `, [args.schema, args.tableName]);
+          `,
+            [args.schema, args.tableName],
+          );
 
           const tableExists = tableCheck.rows[0].exists;
 
@@ -378,15 +438,20 @@ CREATE EXTENSION vector;
             createSQL += `\n)`;
 
             await client.query(createSQL);
-            Logger.info(`✅ Table ${args.tableName} créée avec colonne vectorielle`);
+            Logger.info(
+              `✅ Table ${args.tableName} créée avec colonne vectorielle`,
+            );
           } else if (tableExists) {
             // Vérifier si la colonne existe déjà
-            const colCheck = await client.query(`
+            const colCheck = await client.query(
+              `
               SELECT EXISTS(
                 SELECT 1 FROM information_schema.columns
                 WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
               ) as exists
-            `, [args.schema, args.tableName, args.vectorColumn]);
+            `,
+              [args.schema, args.tableName, args.vectorColumn],
+            );
 
             if (colCheck.rows[0].exists) {
               await client.release();
@@ -406,14 +471,16 @@ CREATE EXTENSION vector;
 
           await client.release();
 
-          return `✅ Colonne vectorielle créée:\n` +
-                 `   Table: ${args.schema}.${args.tableName}\n` +
-                 `   Colonne: ${args.vectorColumn}\n` +
-                 `   Dimensions: ${args.dimensions}\n\n` +
-                 `💡 Vous pouvez maintenant insérer des vecteurs avec pgvector_insert_vector`;
+          return (
+            `✅ Colonne vectorielle créée:\n` +
+            `   Table: ${args.schema}.${args.tableName}\n` +
+            `   Colonne: ${args.vectorColumn}\n` +
+            `   Dimensions: ${args.dimensions}\n\n` +
+            `💡 Vous pouvez maintenant insérer des vecteurs avec pgvector_insert_vector`
+          );
         } catch (error: any) {
-          Logger.error('❌ [pgvector_create_column]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_create_column]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -424,24 +491,40 @@ CREATE EXTENSION vector;
   // ========================================================================
   private insertVector(): void {
     this.server.addTool({
-      name: 'pgvector_insert_vector',
+      name: "pgvector_insert_vector",
       description: `Insère un vecteur dans une table.
 
 🤖 Pour les agents LLM: Utilisez pgvector_insert_with_embedding qui génère
 automatiquement un vrai embedding basé sur le contenu textuel.`,
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        vector: z.array(z.number()).describe('Tableau de nombres représentant le vecteur'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        content: z.string().optional().describe('Contenu textuel associé au vecteur'),
-        metadata: z.record(z.any()).optional().describe('Métadonnées JSON associées (objet clé/valeur)'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        vector: z
+          .array(z.number())
+          .describe("Tableau de nombres représentant le vecteur"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        content: z
+          .string()
+          .optional()
+          .describe("Contenu textuel associé au vecteur"),
+        metadata: z
+          .record(z.any())
+          .optional()
+          .describe("Métadonnées JSON associées (objet clé/valeur)"),
       }),
       execute: async (args) => {
         try {
           const client = await this.pool.connect();
 
-          const vectorString = `[${args.vector.join(',')}]`;
+          const vectorString = `[${args.vector.join(",")}]`;
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           let query = `INSERT INTO ${fullTableName} (${args.vectorColumn}`;
@@ -453,24 +536,24 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
           const valuePlaceholders: string[] = [];
 
           if (args.content !== undefined) {
-            columns.push('content');
+            columns.push("content");
             valuePlaceholders.push(`$${paramIndex++}`);
             values.push(args.content);
           }
 
           if (args.metadata !== undefined) {
-            columns.push('metadata');
+            columns.push("metadata");
             valuePlaceholders.push(`$${paramIndex++}::jsonb`);
             values.push(JSON.stringify(args.metadata));
           }
 
           if (columns.length > 0) {
-            query += `, ${columns.join(', ')}`;
+            query += `, ${columns.join(", ")}`;
           }
           query += `) VALUES ($1::vector`;
 
           if (valuePlaceholders.length > 0) {
-            query += `, ${valuePlaceholders.join(', ')}`;
+            query += `, ${valuePlaceholders.join(", ")}`;
           }
 
           query += `)`;
@@ -479,13 +562,19 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
           await client.release();
 
           Logger.info(`✅ Vecteur inséré dans ${args.tableName}`);
-          return `✅ Vecteur inséré dans ${args.schema}.${args.tableName}\n` +
-                 `   Dimensions: ${args.vector.length}` +
-                 (args.content ? `\n   Content: ${args.content.substring(0, 50)}...` : '') +
-                 (args.metadata ? `\n   Metadata: ${Object.keys(args.metadata).length} champs` : '');
+          return (
+            `✅ Vecteur inséré dans ${args.schema}.${args.tableName}\n` +
+            `   Dimensions: ${args.vector.length}` +
+            (args.content
+              ? `\n   Content: ${args.content.substring(0, 50)}...`
+              : "") +
+            (args.metadata
+              ? `\n   Metadata: ${Object.keys(args.metadata).length} champs`
+              : "")
+          );
         } catch (error: any) {
-          Logger.error('❌ [pgvector_insert_vector]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_insert_vector]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -497,7 +586,7 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
   private insertWithEmbedding(): void {
     // Outil spécial pour LLM: insertion avec vecteur généré par embedding
     this.server.addTool({
-      name: 'pgvector_insert_with_embedding',
+      name: "pgvector_insert_with_embedding",
       description: `🤖 OUTIL POUR AGENTS LLM: Insère des données avec un vecteur EMBEDDING GÉNÉRÉ AUTOMATIQUEMENT.
 
 Génère un embedding réel basé sur le contenu textuel (llm_interpretation, study_name, etc.).
@@ -505,21 +594,51 @@ Utilise l'EmbeddingService (Qwen/OpenRouter par défaut).
 
 Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, sentiment, source_type`,
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table (ex: sierra_embeddings)'),
-        dimensions: z.number().optional().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
+        tableName: z
+          .string()
+          .describe("Nom de la table (ex: sierra_embeddings)"),
+        dimensions: z
+          .number()
+          .optional()
+          .default(4096)
+          .describe("Dimensions du vecteur (4096 pour Qwen)"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
         // Colonnes spécifiques sierra_embeddings
-        symbol: z.string().optional().describe('Symbole (ex: ETHUSD-BMEX)'),
-        study_name: z.string().optional().describe('Nom de l\'étude (ex: MACD, RSI)'),
-        technical_data: z.record(z.any()).optional().describe('Données techniques en JSON'),
-        llm_interpretation: z.string().optional().describe('Interprétation LLM du signal'),
-        sentiment: z.enum(['BULLISH', 'BEARISH', 'NEUTRAL']).optional().describe('Sentiment du marché'),
-        source_type: z.enum(['algo', 'llm']).optional().default('llm').describe('Source: algo ou llm'),
+        symbol: z.string().optional().describe("Symbole (ex: ETHUSD-BMEX)"),
+        study_name: z
+          .string()
+          .optional()
+          .describe("Nom de l'étude (ex: MACD, RSI)"),
+        technical_data: z
+          .record(z.any())
+          .optional()
+          .describe("Données techniques en JSON"),
+        llm_interpretation: z
+          .string()
+          .optional()
+          .describe("Interprétation LLM du signal"),
+        sentiment: z
+          .enum(["BULLISH", "BEARISH", "NEUTRAL"])
+          .optional()
+          .describe("Sentiment du marché"),
+        source_type: z
+          .enum(["algo", "llm"])
+          .optional()
+          .default("llm")
+          .describe("Source: algo ou llm"),
       }),
       execute: async (args) => {
-          // ... (execution logic stays mostly same, but relies on new default args)
-          try {
+        // ... (execution logic stays mostly same, but relies on new default args)
+        try {
           const client = await this.pool.connect();
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
@@ -528,15 +647,21 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           if (args.llm_interpretation) textParts.push(args.llm_interpretation);
           if (args.study_name) textParts.push(`Study: ${args.study_name}`);
           if (args.symbol) textParts.push(`Symbol: ${args.symbol}`);
-          if (args.technical_data) textParts.push(`Technical: ${JSON.stringify(args.technical_data)}`);
+          if (args.technical_data)
+            textParts.push(`Technical: ${JSON.stringify(args.technical_data)}`);
 
-          const embeddingText = textParts.join(' | ') || 'No content provided';
+          const embeddingText = textParts.join(" | ") || "No content provided";
 
           // Générer l'embedding via EmbeddingService
-          Logger.info(`🔄 Génération embedding pour: "${embeddingText.substring(0, 50)}..."`);
-          const embedding = await embeddingService.generateEmbedding(embeddingText, {
-            dimensions: args.dimensions
-          });
+          Logger.info(
+            `🔄 Génération embedding pour: "${embeddingText.substring(0, 50)}..."`,
+          );
+          const embedding = await embeddingService.generateEmbedding(
+            embeddingText,
+            {
+              dimensions: args.dimensions,
+            },
+          );
           Logger.info(`✅ Embedding généré: ${embedding.length} dimensions`);
 
           // Construire dynamiquement les colonnes et valeurs
@@ -547,48 +672,48 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           // Le vecteur embedding
           valueParts.push(`$${paramIndex++}::vector`);
-          values.push(`[${embedding.join(',')}]`);
+          values.push(`[${embedding.join(",")}]`);
 
           // Ajouter les colonnes optionnelles
           if (args.symbol !== undefined) {
-            columns.push('symbol');
+            columns.push("symbol");
             valueParts.push(`$${paramIndex++}`);
             values.push(args.symbol);
           }
 
           if (args.study_name !== undefined) {
-            columns.push('study_name');
+            columns.push("study_name");
             valueParts.push(`$${paramIndex++}`);
             values.push(args.study_name);
           }
 
           if (args.technical_data !== undefined) {
-            columns.push('technical_data');
+            columns.push("technical_data");
             valueParts.push(`$${paramIndex++}::jsonb`);
             values.push(JSON.stringify(args.technical_data));
           }
 
           if (args.llm_interpretation !== undefined) {
-            columns.push('llm_interpretation');
+            columns.push("llm_interpretation");
             valueParts.push(`$${paramIndex++}`);
             values.push(args.llm_interpretation);
           }
 
           if (args.sentiment !== undefined) {
-            columns.push('sentiment');
+            columns.push("sentiment");
             valueParts.push(`$${paramIndex++}`);
             values.push(args.sentiment);
           }
 
           if (args.source_type !== undefined) {
-            columns.push('source_type');
+            columns.push("source_type");
             valueParts.push(`$${paramIndex++}`);
             values.push(args.source_type);
           }
 
           const query = `
-            INSERT INTO ${fullTableName} (${columns.join(', ')})
-            VALUES (${valueParts.join(', ')})
+            INSERT INTO ${fullTableName} (${columns.join(", ")})
+            VALUES (${valueParts.join(", ")})
             RETURNING id
           `;
 
@@ -607,12 +732,13 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           if (args.symbol) output += `   Symbol: ${args.symbol}\n`;
           if (args.study_name) output += `   Study: ${args.study_name}\n`;
           if (args.sentiment) output += `   Sentiment: ${args.sentiment}\n`;
-          if (args.llm_interpretation) output += `   Interpretation: ${args.llm_interpretation.substring(0, 100)}...\n`;
+          if (args.llm_interpretation)
+            output += `   Interpretation: ${args.llm_interpretation.substring(0, 100)}...\n`;
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_insert_with_embedding]', error.message);
-          return this.formatError(error, 'Insertion avec vecteur auto');
+          Logger.error("❌ [pgvector_insert_with_embedding]", error.message);
+          return this.formatError(error, "Insertion avec vecteur auto");
         }
       },
     });
@@ -623,22 +749,60 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private vectorSearch(): void {
     this.server.addTool({
-      name: 'pgvector_search',
-      description: 'Recherche les vecteurs les plus similaires (nearest neighbors)',
+      name: "pgvector_search",
+      description:
+        "Recherche les vecteurs les plus similaires (nearest neighbors)",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        queryVector: z.array(z.number()).optional().describe('Vecteur de requête'),
-        useRandomVector: z.boolean().optional().default(false).describe('TESTS UNIQUEMENT: Génère un vecteur aléatoire pour tester les performances (ne pas utiliser pour la recherche réelle)'),
-        dimensions: z.number().optional().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        topK: z.number().optional().default(5).describe('Nombre de résultats à retourner'),
-        distanceMetric: z.enum(['<=>', '<->', '<#>']).optional().default('<=>').describe('Métrique de distance: <=> (cosine), <-> (L2), <#> (inner product)'),
-        selectColumns: z.string().optional().default('*').describe('Colonnes à sélectionner (ex: id, content, metadata)'),
-        whereClause: z.string().optional().describe('Clause WHERE additionnelle (ex: category = \'docs\')'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        queryVector: z
+          .array(z.number())
+          .optional()
+          .describe("Vecteur de requête"),
+        useRandomVector: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe(
+            "TESTS UNIQUEMENT: Génère un vecteur aléatoire pour tester les performances (ne pas utiliser pour la recherche réelle)",
+          ),
+        dimensions: z
+          .number()
+          .optional()
+          .default(4096)
+          .describe("Dimensions du vecteur (4096 pour Qwen)"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        topK: z
+          .number()
+          .optional()
+          .default(5)
+          .describe("Nombre de résultats à retourner"),
+        distanceMetric: z
+          .enum(["<=>", "<->", "<#>"])
+          .optional()
+          .default("<=>")
+          .describe(
+            "Métrique de distance: <=> (cosine), <-> (L2), <#> (inner product)",
+          ),
+        selectColumns: z
+          .string()
+          .optional()
+          .default("*")
+          .describe("Colonnes à sélectionner (ex: id, content, metadata)"),
+        whereClause: z
+          .string()
+          .optional()
+          .describe("Clause WHERE additionnelle (ex: category = 'docs')"),
       }),
       execute: async (args) => {
-  
         try {
           const client = await this.pool.connect();
 
@@ -651,23 +815,23 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             queryVector = [];
             for (let i = 0; i < args.dimensions; i++) {
               // Générer des valeurs aléatoires entre -1 et 1
-              queryVector.push((Math.random() * 2) - 1);
+              queryVector.push(Math.random() * 2 - 1);
             }
             isRandom = true;
           } else if (!args.queryVector) {
-            return '❌ Erreur: Vous devez fournir soit queryVector, soit activer useRandomVector';
+            return "❌ Erreur: Vous devez fournir soit queryVector, soit activer useRandomVector";
           } else {
             queryVector = args.queryVector;
           }
 
-          const vectorString = `[${queryVector.join(',')}]`;
+          const vectorString = `[${queryVector.join(",")}]`;
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           // Nom de la métrique pour l'affichage
           const metricNames: Record<string, string> = {
-            '<=>': 'Cosine Distance',
-            '<->': 'L2 Distance (Euclidean)',
-            '<#>': 'Negative Inner Product'
+            "<=>": "Cosine Distance",
+            "<->": "L2 Distance (Euclidean)",
+            "<#>": "Negative Inner Product",
           };
 
           let query = `SELECT ${args.selectColumns}, 1 - (${args.vectorColumn} ${args.distanceMetric} '${vectorString}'::vector) as similarity\n`;
@@ -676,7 +840,10 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           query += `LIMIT ${args.topK}`;
 
           if (args.whereClause) {
-            query = query.replace(`FROM ${fullTableName}`, `FROM ${fullTableName} WHERE ${args.whereClause}`);
+            query = query.replace(
+              `FROM ${fullTableName}`,
+              `FROM ${fullTableName} WHERE ${args.whereClause}`,
+            );
           }
 
           const startTime = Date.now();
@@ -701,11 +868,14 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             result.rows.forEach((row: any, index: number) => {
               output += `**${index + 1}.** Similarité: ${(row.similarity * 100).toFixed(2)}%\n`;
               // Afficher les colonnes sélectionnées (sauf similarity)
-              Object.keys(row).forEach(key => {
-                if (key !== 'similarity' && key !== args.vectorColumn) {
+              Object.keys(row).forEach((key) => {
+                if (key !== "similarity" && key !== args.vectorColumn) {
                   const val = row[key];
                   if (val !== null && val !== undefined) {
-                    const displayVal = typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val);
+                    const displayVal =
+                      typeof val === "object"
+                        ? JSON.stringify(val, null, 2)
+                        : String(val);
                     if (displayVal.length < 100) {
                       output += `   ${key}: ${displayVal}\n`;
                     } else {
@@ -714,16 +884,16 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
                   }
                 }
               });
-              output += '\n';
+              output += "\n";
             });
           } else {
-            output += 'Aucun résultat trouvé\n';
+            output += "Aucun résultat trouvé\n";
           }
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_search]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_search]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -734,13 +904,21 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private generateRandomVector(): void {
     this.server.addTool({
-      name: 'pgvector_generate_random',
-      description: 'Génère un vecteur aléatoire pour tests et expérimentation',
+      name: "pgvector_generate_random",
+      description: "Génère un vecteur aléatoire pour tests et expérimentation",
       parameters: z.object({
-        dimensions: z.number().optional().default(4096).describe('Dimensions du vecteur (4096 pour Qwen)'),
-        min: z.number().optional().default(-1).describe('Valeur minimale'),
-        max: z.number().optional().default(1).describe('Valeur maximale'),
-        normalize: z.boolean().optional().default(true).describe('Normaliser le vecteur (recommandé pour cosine)'),
+        dimensions: z
+          .number()
+          .optional()
+          .default(4096)
+          .describe("Dimensions du vecteur (4096 pour Qwen)"),
+        min: z.number().optional().default(-1).describe("Valeur minimale"),
+        max: z.number().optional().default(1).describe("Valeur maximale"),
+        normalize: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Normaliser le vecteur (recommandé pour cosine)"),
       }),
       execute: async (args) => {
         // ... (unchanged logic)
@@ -748,29 +926,36 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           // Générer un vecteur aléatoire
           let vector: number[] = [];
           for (let i = 0; i < args.dimensions; i++) {
-            const value = args.min + (Math.random() * (args.max - args.min));
+            const value = args.min + Math.random() * (args.max - args.min);
             vector.push(value);
           }
 
           // Normaliser si demandé
           if (args.normalize) {
-            const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+            const magnitude = Math.sqrt(
+              vector.reduce((sum, val) => sum + val * val, 0),
+            );
             if (magnitude > 0) {
-              vector = vector.map(val => val / magnitude);
+              vector = vector.map((val) => val / magnitude);
             }
           }
 
           let output = `🎲 **Vecteur aléatoire généré**\n\n`;
           output += `📐 Dimensions: ${args.dimensions}\n`;
           output += `📊 Plage: [${args.min}, ${args.max}]\n`;
-          output += `⚖️ Normalisé: ${args.normalize ? 'Oui ✅' : 'Non ❌'}\n\n`;
+          output += `⚖️ Normalisé: ${args.normalize ? "Oui ✅" : "Non ❌"}\n\n`;
 
           // Afficher les premières valeurs
           output += `🔢 **Premières 10 valeurs:**\n`;
-          output += `[${vector.slice(0, 10).map(v => v.toFixed(6)).join(', ')}]\n\n`;
+          output += `[${vector
+            .slice(0, 10)
+            .map((v) => v.toFixed(6))
+            .join(", ")}]\n\n`;
 
           // Afficher la magnitude
-          const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+          const magnitude = Math.sqrt(
+            vector.reduce((sum, val) => sum + val * val, 0),
+          );
           output += `📏 Magnitude: ${magnitude.toFixed(6)}\n\n`;
 
           // Afficher l'utilisation
@@ -779,7 +964,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           output += `\`\`\`json\n`;
           output += `{\n`;
           output += `  "tableName": "ma_table",\n`;
-          output += `  "queryVector": [${vector.slice(0, 20).join(', ')}, ...],\n`;
+          output += `  "queryVector": [${vector.slice(0, 20).join(", ")}, ...],\n`;
           output += `  "topK": 5\n`;
           output += `}\n`;
           output += `\`\`\`\n\n`;
@@ -795,8 +980,8 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_generate_random]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_generate_random]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -806,29 +991,66 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private createVectorIndex(): void {
     this.server.addTool({
-      name: 'pgvector_create_index',
-      description: 'Crée un index sur une colonne vectorielle pour accélérer les recherches',
+      name: "pgvector_create_index",
+      description:
+        "Crée un index sur une colonne vectorielle pour accélérer les recherches",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        indexType: z.enum(['hnsw', 'ivfflat']).optional().default('hnsw').describe('Type d\'index: hnsw (rapide, précis) ou ivfflat (moins précis, plus compact)'),
-        indexName: z.string().optional().describe('Nom de l\'index (généré automatiquement si omis)'),
-        distanceMetric: z.enum(['vector_cosine_ops', 'vector_l2_ops', 'vector_ip_ops']).optional().default('vector_cosine_ops').describe('Opérateur de distance'),
-        hnswM: z.number().optional().default(16).describe('Paramètre HNSW: m (connexions par noeud, 16-64)'),
-        hnswEfConstruction: z.number().optional().default(64).describe('Paramètre HNSW: ef_construction (40-400)'),
-        ivfflatLists: z.number().optional().describe('Paramètre IVFFlat: lists (autocalculé si omis: rows/1000)'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        indexType: z
+          .enum(["hnsw", "ivfflat"])
+          .optional()
+          .default("hnsw")
+          .describe(
+            "Type d'index: hnsw (rapide, précis) ou ivfflat (moins précis, plus compact)",
+          ),
+        indexName: z
+          .string()
+          .optional()
+          .describe("Nom de l'index (généré automatiquement si omis)"),
+        distanceMetric: z
+          .enum(["vector_cosine_ops", "vector_l2_ops", "vector_ip_ops"])
+          .optional()
+          .default("vector_cosine_ops")
+          .describe("Opérateur de distance"),
+        hnswM: z
+          .number()
+          .optional()
+          .default(16)
+          .describe("Paramètre HNSW: m (connexions par noeud, 16-64)"),
+        hnswEfConstruction: z
+          .number()
+          .optional()
+          .default(64)
+          .describe("Paramètre HNSW: ef_construction (40-400)"),
+        ivfflatLists: z
+          .number()
+          .optional()
+          .describe(
+            "Paramètre IVFFlat: lists (autocalculé si omis: rows/1000)",
+          ),
       }),
       execute: async (args) => {
         try {
           const client = await this.pool.connect();
 
           // Générer le nom de l'index
-          const indexName = args.indexName || `${args.tableName}_${args.vectorColumn}_${args.indexType}_idx`;
+          const indexName =
+            args.indexName ||
+            `${args.tableName}_${args.vectorColumn}_${args.indexType}_idx`;
 
           let indexSQL = `CREATE INDEX IF NOT EXISTS ${indexName} ON "${args.schema}"."${args.tableName}" `;
 
-          if (args.indexType === 'hnsw') {
+          if (args.indexType === "hnsw") {
             indexSQL += `USING hnsw (${args.vectorColumn} ${args.distanceMetric}) `;
             indexSQL += `WITH (m = ${args.hnswM}, ef_construction = ${args.hnswEfConstruction})`;
           } else {
@@ -845,17 +1067,19 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           await client.release();
 
           Logger.info(`✅ Index ${indexName} créé`);
-          return `✅ Index vectoriel créé:\n` +
-                 `   Nom: ${indexName}\n` +
-                 `   Table: ${args.schema}.${args.tableName}\n` +
-                 `   Colonne: ${args.vectorColumn}\n` +
-                 `   Type: ${args.indexType.toUpperCase()}\n` +
-                 `   Métrique: ${args.distanceMetric}\n` +
-                 `   Durée de création: ${duration}ms\n\n` +
-                 `💡 HNSW est recommandé pour la plupart des cas d'usage`;
+          return (
+            `✅ Index vectoriel créé:\n` +
+            `   Nom: ${indexName}\n` +
+            `   Table: ${args.schema}.${args.tableName}\n` +
+            `   Colonne: ${args.vectorColumn}\n` +
+            `   Type: ${args.indexType.toUpperCase()}\n` +
+            `   Métrique: ${args.distanceMetric}\n` +
+            `   Durée de création: ${duration}ms\n\n` +
+            `💡 HNSW est recommandé pour la plupart des cas d'usage`
+          );
         } catch (error: any) {
-          Logger.error('❌ [pgvector_create_index]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_create_index]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -866,12 +1090,20 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private deleteVectors(): void {
     this.server.addTool({
-      name: 'pgvector_delete',
-      description: 'Supprime des vecteurs d\'une table',
+      name: "pgvector_delete",
+      description: "Supprime des vecteurs d'une table",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        whereClause: z.string().describe('Clause WHERE pour identifier les vecteurs à supprimer (ex: id = 1)'),
+        tableName: z.string().describe("Nom de la table"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        whereClause: z
+          .string()
+          .describe(
+            "Clause WHERE pour identifier les vecteurs à supprimer (ex: id = 1)",
+          ),
       }),
       execute: async (args) => {
         try {
@@ -880,29 +1112,39 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           // Compter les lignes avant suppression
-          const countResult = await client.query(`SELECT COUNT(*) as count FROM ${fullTableName}`);
+          const countResult = await client.query(
+            `SELECT COUNT(*) as count FROM ${fullTableName}`,
+          );
           const beforeCount = parseInt(countResult.rows[0].count);
 
           // Supprimer
-          await client.query(`DELETE FROM ${fullTableName} WHERE ${args.whereClause}`);
+          await client.query(
+            `DELETE FROM ${fullTableName} WHERE ${args.whereClause}`,
+          );
 
           // Compter après
-          const afterCountResult = await client.query(`SELECT COUNT(*) as count FROM ${fullTableName}`);
+          const afterCountResult = await client.query(
+            `SELECT COUNT(*) as count FROM ${fullTableName}`,
+          );
           const afterCount = parseInt(afterCountResult.rows[0].count);
 
           await client.release();
 
           const deletedCount = beforeCount - afterCount;
-          Logger.info(`✅ ${deletedCount} vecteur(s) supprimé(s) de ${args.tableName}`);
+          Logger.info(
+            `✅ ${deletedCount} vecteur(s) supprimé(s) de ${args.tableName}`,
+          );
 
-          return `✅ Suppression effectuée:\n` +
-                 `   Table: ${args.schema}.${args.tableName}\n` +
-                 `   Condition: ${args.whereClause}\n` +
-                 `   Vecteurs supprimés: ${deletedCount}\n` +
-                 `   Restants: ${afterCount}`;
+          return (
+            `✅ Suppression effectuée:\n` +
+            `   Table: ${args.schema}.${args.tableName}\n` +
+            `   Condition: ${args.whereClause}\n` +
+            `   Vecteurs supprimés: ${deletedCount}\n` +
+            `   Restants: ${afterCount}`
+          );
         } catch (error: any) {
-          Logger.error('❌ [pgvector_delete]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_delete]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -913,12 +1155,21 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private vectorStats(): void {
     this.server.addTool({
-      name: 'pgvector_stats',
-      description: 'Affiche des statistiques sur les colonnes vectorielles d\'une table',
+      name: "pgvector_stats",
+      description:
+        "Affiche des statistiques sur les colonnes vectorielles d'une table",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
       }),
       execute: async (args) => {
         try {
@@ -933,23 +1184,29 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           `);
 
           // Informations sur la colonne
-          const columnInfo = await client.query(`
+          const columnInfo = await client.query(
+            `
             SELECT
               data_type,
               udt_name
             FROM information_schema.columns
             WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-          `, [args.schema, args.tableName, args.vectorColumn]);
+          `,
+            [args.schema, args.tableName, args.vectorColumn],
+          );
 
           // Index sur cette colonne
-          const indexInfo = await client.query(`
+          const indexInfo = await client.query(
+            `
             SELECT
               indexname,
               indexdef
             FROM pg_indexes
             WHERE schemaname = $1 AND tablename = $2
               AND indexdef LIKE '%${args.vectorColumn}%'
-          `, [args.schema, args.tableName]);
+          `,
+            [args.schema, args.tableName],
+          );
 
           await client.release();
 
@@ -966,7 +1223,9 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           output += `**Total lignes:** ${countResult.rows[0].count}\n`;
           output += `**Vecteurs non-NULL:** ${countResult.rows[0].vector_count}\n`;
 
-          const nullCount = parseInt(countResult.rows[0].count) - parseInt(countResult.rows[0].vector_count);
+          const nullCount =
+            parseInt(countResult.rows[0].count) -
+            parseInt(countResult.rows[0].vector_count);
           if (nullCount > 0) {
             output += `⚠️ **Vecteurs NULL:** ${nullCount}\n`;
           }
@@ -985,8 +1244,8 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_stats]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_stats]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -997,16 +1256,22 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private listVectorTables(): void {
     this.server.addTool({
-      name: 'pgvector_list_tables',
-      description: 'Liste toutes les tables qui contiennent des colonnes vectorielles',
+      name: "pgvector_list_tables",
+      description:
+        "Liste toutes les tables qui contiennent des colonnes vectorielles",
       parameters: z.object({
-        schema: z.string().optional().default('public').describe('Schéma à explorer'),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma à explorer"),
       }),
       execute: async (args) => {
         try {
           const client = await this.pool.connect();
 
-          const result = await client.query(`
+          const result = await client.query(
+            `
             SELECT
               t.table_name,
               c.column_name,
@@ -1018,13 +1283,17 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             WHERE c.table_schema = $1
               AND c.udt_name = 'vector'
             ORDER BY t.table_name, c.column_name
-          `, [args.schema]);
+          `,
+            [args.schema],
+          );
 
           await client.release();
 
           if (result.rows.length === 0) {
-            return `📋 Aucune table avec colonnes vectorielles trouvée dans le schéma '${args.schema}'\n\n` +
-                   `💡 Utilisez pgvector_create_column pour ajouter une colonne vectorielle`;
+            return (
+              `📋 Aucune table avec colonnes vectorielles trouvée dans le schéma '${args.schema}'\n\n` +
+              `💡 Utilisez pgvector_create_column pour ajouter une colonne vectorielle`
+            );
           }
 
           let output = `📋 **Tables avec colonnes vectorielles (${result.rows.length})**\n\n`;
@@ -1032,13 +1301,13 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           result.rows.forEach((row: any, index: number) => {
             output += `${index + 1}. ${args.schema}.${row.table_name}\n`;
             output += `   Colonne: ${row.column_name}\n`;
-            output += `   Type: ${row.udt_name}${row.character_maximum_length ? `(${row.character_maximum_length})` : ''}\n\n`;
+            output += `   Type: ${row.udt_name}${row.character_maximum_length ? `(${row.character_maximum_length})` : ""}\n\n`;
           });
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_list_tables]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_list_tables]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -1049,17 +1318,38 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private batchInsertVectors(): void {
     this.server.addTool({
-      name: 'pgvector_batch_insert',
-      description: 'Insère plusieurs vecteurs en une seule requête (plus performant)',
+      name: "pgvector_batch_insert",
+      description:
+        "Insère plusieurs vecteurs en une seule requête (plus performant)",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        vectors: z.array(z.object({
-          vector: z.array(z.number()).describe('Tableau de nombres représentant le vecteur'),
-          content: z.string().optional().describe('Contenu textuel associé'),
-          metadata: z.record(z.any()).optional().describe('Métadonnées JSON'),
-        })).describe('Tableau de vecteurs avec leurs données associées'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        vectors: z
+          .array(
+            z.object({
+              vector: z
+                .array(z.number())
+                .describe("Tableau de nombres représentant le vecteur"),
+              content: z
+                .string()
+                .optional()
+                .describe("Contenu textuel associé"),
+              metadata: z
+                .record(z.any())
+                .optional()
+                .describe("Métadonnées JSON"),
+            }),
+          )
+          .describe("Tableau de vecteurs avec leurs données associées"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
       }),
       execute: async (args) => {
         try {
@@ -1068,13 +1358,15 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           // Vérifier que tous les vecteurs ont les mêmes champs optionnels
-          const hasContent = args.vectors.every(v => v.content !== undefined);
-          const hasMetadata = args.vectors.every(v => v.metadata !== undefined);
+          const hasContent = args.vectors.every((v) => v.content !== undefined);
+          const hasMetadata = args.vectors.every(
+            (v) => v.metadata !== undefined,
+          );
 
           // Colonnes de la requête (uniquement si tous ont les champs)
           const columns = [args.vectorColumn];
-          if (hasContent) columns.push('content');
-          if (hasMetadata) columns.push('metadata');
+          if (hasContent) columns.push("content");
+          if (hasMetadata) columns.push("metadata");
 
           // Construire VALUES et les paramètres
           const valuesPlaceholders: string[] = [];
@@ -1083,7 +1375,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           for (const item of args.vectors) {
             // Ajouter le vecteur
-            const vectorStr = `[${item.vector.join(',')}]`;
+            const vectorStr = `[${item.vector.join(",")}]`;
             queryParams.push(vectorStr);
             let placeholders = `($${paramIndex++}::vector`;
 
@@ -1099,11 +1391,11 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
               placeholders += `, $${paramIndex++}::jsonb`;
             }
 
-            placeholders += ')';
+            placeholders += ")";
             valuesPlaceholders.push(placeholders);
           }
 
-          const query = `INSERT INTO ${fullTableName} (${columns.join(', ')}) VALUES ${valuesPlaceholders.join(', ')} RETURNING *`;
+          const query = `INSERT INTO ${fullTableName} (${columns.join(", ")}) VALUES ${valuesPlaceholders.join(", ")} RETURNING *`;
 
           const startTime = Date.now();
           const result = await client.query(query, queryParams);
@@ -1111,16 +1403,20 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           await client.release();
 
-          Logger.info(`✅ ${result.rows.length} vecteurs insérés dans ${args.tableName}`);
-          return `✅ Insertion en lot réussie:\n` +
-                 `   Table: ${args.schema}.${args.tableName}\n` +
-                 `   Vecteurs insérés: ${result.rows.length}\n` +
-                 `   Colonnes: ${columns.join(', ')}\n` +
-                 `   Durée: ${duration}ms\n` +
-                 `   Moyenne: ${(duration / result.rows.length).toFixed(2)}ms/vecteur`;
+          Logger.info(
+            `✅ ${result.rows.length} vecteurs insérés dans ${args.tableName}`,
+          );
+          return (
+            `✅ Insertion en lot réussie:\n` +
+            `   Table: ${args.schema}.${args.tableName}\n` +
+            `   Vecteurs insérés: ${result.rows.length}\n` +
+            `   Colonnes: ${columns.join(", ")}\n` +
+            `   Durée: ${duration}ms\n` +
+            `   Moyenne: ${(duration / result.rows.length).toFixed(2)}ms/vecteur`
+          );
         } catch (error: any) {
-          Logger.error('❌ [pgvector_batch_insert]', error.message);
-          return this.formatError(error, 'Erreur');
+          Logger.error("❌ [pgvector_batch_insert]", error.message);
+          return this.formatError(error, "Erreur");
         }
       },
     });
@@ -1131,20 +1427,32 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private updateVector(): void {
     this.server.addTool({
-      name: 'pgvector_update',
-      description: 'Met à jour un vecteur existant',
+      name: "pgvector_update",
+      description: "Met à jour un vecteur existant",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        vector: z.array(z.number()).describe('Nouveau vecteur'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        whereClause: z.string().describe('Clause WHERE pour identifier la ligne à mettre à jour (ex: id = 1)'),
+        tableName: z.string().describe("Nom de la table"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        vector: z.array(z.number()).describe("Nouveau vecteur"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        whereClause: z
+          .string()
+          .describe(
+            "Clause WHERE pour identifier la ligne à mettre à jour (ex: id = 1)",
+          ),
       }),
       execute: async (args) => {
         try {
           const client = await this.pool.connect();
 
-          const vectorString = `[${args.vector.join(',')}]`;
+          const vectorString = `[${args.vector.join(",")}]`;
           const fullTableName = `"${args.schema}"."${args.tableName}"`;
 
           // Utiliser des paramètres pour éviter les injections
@@ -1163,14 +1471,16 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           }
 
           Logger.info(`✅ Vecteur mis à jour dans ${args.tableName}`);
-          return `✅ Vecteur mis à jour:\n` +
-                 `   Table: ${args.schema}.${args.tableName}\n` +
-                 `   Colonne: ${args.vectorColumn}\n` +
-                 `   Lignes affectées: ${result.rows.length}\n` +
-                 `   Nouvelles dimensions: ${args.vector.length}`;
+          return (
+            `✅ Vecteur mis à jour:\n` +
+            `   Table: ${args.schema}.${args.tableName}\n` +
+            `   Colonne: ${args.vectorColumn}\n` +
+            `   Lignes affectées: ${result.rows.length}\n` +
+            `   Nouvelles dimensions: ${args.vector.length}`
+          );
         } catch (error: any) {
-          Logger.error('❌ [pgvector_update]', error.message);
-          return this.formatError(error, 'Mise à jour de vecteur');
+          Logger.error("❌ [pgvector_update]", error.message);
+          return this.formatError(error, "Mise à jour de vecteur");
         }
       },
     });
@@ -1181,16 +1491,38 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private validateVectors(): void {
     this.server.addTool({
-      name: 'pgvector_validate',
-      description: 'Valide un ensemble de vecteurs avant insertion (vérifie dimensions, cohérence, compatibilité table)',
+      name: "pgvector_validate",
+      description:
+        "Valide un ensemble de vecteurs avant insertion (vérifie dimensions, cohérence, compatibilité table)",
       parameters: z.object({
-        vectors: z.array(z.object({
-          vector: z.array(z.number()).describe('Tableau de nombres représentant le vecteur'),
-        })).describe('Vecteurs à valider'),
-        tableName: z.string().optional().describe('Nom de la table pour vérifier la compatibilité'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        strictMode: z.boolean().optional().default(false).describe('Échoue rapidement dès la première erreur'),
+        vectors: z
+          .array(
+            z.object({
+              vector: z
+                .array(z.number())
+                .describe("Tableau de nombres représentant le vecteur"),
+            }),
+          )
+          .describe("Vecteurs à valider"),
+        tableName: z
+          .string()
+          .optional()
+          .describe("Nom de la table pour vérifier la compatibilité"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        strictMode: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Échoue rapidement dès la première erreur"),
       }),
       execute: async (args) => {
         try {
@@ -1208,14 +1540,19 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           if (args.tableName) {
             try {
               const client = await this.pool.connect();
-              const colResult = await client.query(`
+              const colResult = await client.query(
+                `
                 SELECT character_maximum_length
                 FROM information_schema.columns
                 WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-              `, [args.schema, args.tableName, args.vectorColumn]);
+              `,
+                [args.schema, args.tableName, args.vectorColumn],
+              );
 
               if (colResult.rows.length > 0) {
-                expectedDimensions = parseInt(colResult.rows[0].character_maximum_length);
+                expectedDimensions = parseInt(
+                  colResult.rows[0].character_maximum_length,
+                );
               }
               await client.release();
             } catch {
@@ -1251,21 +1588,29 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           // Vérifier cohérence des dimensions
           if (dimensionsSet.size > 1) {
             compatible = false;
-            issues.push(`⚠️ Dimensions incohérentes: ${Array.from(dimensionsSet).join(', ')}D`);
-            suggestions.push(`Tous les vecteurs doivent avoir la même dimension`);
+            issues.push(
+              `⚠️ Dimensions incohérentes: ${Array.from(dimensionsSet).join(", ")}D`,
+            );
+            suggestions.push(
+              `Tous les vecteurs doivent avoir la même dimension`,
+            );
           }
 
           // Vérifier NaN
           if (nanVectors.length > 0) {
             compatible = false;
             issues.push(`⚠️ NaN détecté dans ${nanVectors.length} vecteur(s)`);
-            suggestions.push(`Remplacez les valeurs NaN par 0 ou une valeur par défaut`);
+            suggestions.push(
+              `Remplacez les valeurs NaN par 0 ou une valeur par défaut`,
+            );
           }
 
           // Vérifier Inf
           if (infVectors.length > 0) {
             compatible = false;
-            issues.push(`⚠️ Infinite détecté dans ${infVectors.length} vecteur(s)`);
+            issues.push(
+              `⚠️ Infinite détecté dans ${infVectors.length} vecteur(s)`,
+            );
             suggestions.push(`Les valeurs infinies ne sont pas supportées`);
           }
 
@@ -1282,13 +1627,19 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
               const actualDimensions = dimensionsArray[0];
               if (actualDimensions !== expectedDimensions) {
                 compatible = false;
-                issues.push(`⚠️ Dimensions incompatibles avec la table: ${actualDimensions}D ≠ ${expectedDimensions}D attendus`);
-                suggestions.push(`Utilisez des vecteurs de ${expectedDimensions} dimensions pour la table ${args.schema}.${args.tableName}`);
+                issues.push(
+                  `⚠️ Dimensions incompatibles avec la table: ${actualDimensions}D ≠ ${expectedDimensions}D attendus`,
+                );
+                suggestions.push(
+                  `Utilisez des vecteurs de ${expectedDimensions} dimensions pour la table ${args.schema}.${args.tableName}`,
+                );
               }
             } else {
               // Aucune dimension valide trouvée (vecteurs vides)
               compatible = false;
-              issues.push(`Impossible de déterminer les dimensions (vecteurs vides ou invalides)`);
+              issues.push(
+                `Impossible de déterminer les dimensions (vecteurs vides ou invalides)`,
+              );
             }
           }
 
@@ -1298,22 +1649,22 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           const dimensionsArray = Array.from(dimensionsSet);
           if (dimensionsArray.length > 0) {
-            output += `📏 Dimensions trouvées: ${dimensionsArray.join(', ')}D\n\n`;
+            output += `📏 Dimensions trouvées: ${dimensionsArray.join(", ")}D\n\n`;
           } else {
             output += `📏 Dimensions trouvées: Aucune (vecteurs vides)\n\n`;
           }
 
-          output += `✅ **Compatible:** ${compatible ? 'OUI' : 'NON'}\n\n`;
+          output += `✅ **Compatible:** ${compatible ? "OUI" : "NON"}\n\n`;
 
           if (issues.length > 0) {
             output += `❌ **Problèmes (${issues.length}):**\n`;
-            issues.forEach(issue => output += `   ${issue}\n`);
+            issues.forEach((issue) => (output += `   ${issue}\n`));
             output += `\n`;
           }
 
           if (suggestions.length > 0) {
             output += `💡 **Suggestions:**\n`;
-            suggestions.forEach(sug => output += `   • ${sug}\n`);
+            suggestions.forEach((sug) => (output += `   • ${sug}\n`));
             output += `\n`;
           }
 
@@ -1330,8 +1681,8 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_validate]', error.message);
-          return this.formatError(error, 'Validation de vecteurs');
+          Logger.error("❌ [pgvector_validate]", error.message);
+          return this.formatError(error, "Validation de vecteurs");
         }
       },
     });
@@ -1342,12 +1693,23 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private normalizeVector(): void {
     this.server.addTool({
-      name: 'pgvector_normalize',
-      description: 'Normalise un vecteur pour améliorer les recherches de similarité',
+      name: "pgvector_normalize",
+      description:
+        "Normalise un vecteur pour améliorer les recherches de similarité",
       parameters: z.object({
-        vector: z.array(z.number()).describe('Vecteur à normaliser'),
-        method: z.enum(['l2', 'max', 'minmax', 'sum']).optional().default('l2').describe('Méthode de normalisation: l2 (euclidienne), max (max value), minmax (0-1), sum (sum=1)'),
-        decimals: z.number().optional().default(6).describe('Nombre de décimales à conserver'),
+        vector: z.array(z.number()).describe("Vecteur à normaliser"),
+        method: z
+          .enum(["l2", "max", "minmax", "sum"])
+          .optional()
+          .default("l2")
+          .describe(
+            "Méthode de normalisation: l2 (euclidienne), max (max value), minmax (0-1), sum (sum=1)",
+          ),
+        decimals: z
+          .number()
+          .optional()
+          .default(6)
+          .describe("Nombre de décimales à conserver"),
       }),
       execute: async (args) => {
         try {
@@ -1356,26 +1718,26 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           let result: number[];
 
           switch (args.method) {
-            case 'l2': {
+            case "l2": {
               // Normalisation L2 (euclidienne)
               const sumSquares = vec.reduce((sum, val) => sum + val * val, 0);
               const norm = Math.sqrt(sumSquares);
               if (norm === 0) {
                 return `❌ **Erreur: Impossible de normaliser**\n\nLa norme L2 est 0 (vecteur nul)`;
               }
-              result = vec.map(val => val / norm);
+              result = vec.map((val) => val / norm);
               break;
             }
-            case 'max': {
+            case "max": {
               // Normalisation par max
               const maxVal = Math.max(...vec.map(Math.abs));
               if (maxVal === 0) {
                 return `❌ **Erreur: Impossible de normaliser**\n\nLe maximum est 0 (vecteur nul)`;
               }
-              result = vec.map(val => val / maxVal);
+              result = vec.map((val) => val / maxVal);
               break;
             }
-            case 'minmax': {
+            case "minmax": {
               // Normalisation MinMax [0,1]
               const minVal = Math.min(...vec);
               const maxVal = Math.max(...vec);
@@ -1383,16 +1745,16 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
               if (range === 0) {
                 return `❌ **Erreur: Impossible de normaliser**\n\nLe range est 0 (toutes les valeurs identiques)`;
               }
-              result = vec.map(val => (val - minVal) / range);
+              result = vec.map((val) => (val - minVal) / range);
               break;
             }
-            case 'sum': {
+            case "sum": {
               // Normalisation par somme (sum = 1)
               const sum = vec.reduce((s, val) => s + Math.abs(val), 0);
               if (sum === 0) {
                 return `❌ **Erreur: Impossible de normaliser**\n\nLa somme est 0 (vecteur nul)`;
               }
-              result = vec.map(val => val / sum);
+              result = vec.map((val) => val / sum);
               break;
             }
             default:
@@ -1400,13 +1762,15 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           }
 
           // Arrondir
-          result = result.map(val => {
+          result = result.map((val) => {
             const rounded = parseFloat(val.toFixed(args.decimals));
             return rounded;
           });
 
           // Vérifier la nouvelle norme
-          const newNorm = Math.sqrt(result.reduce((sum, val) => sum + val * val, 0));
+          const newNorm = Math.sqrt(
+            result.reduce((sum, val) => sum + val * val, 0),
+          );
 
           let output = `✅ **Vecteur Normalisé**\n\n`;
           output += `📊 Méthode: ${args.method.toUpperCase()}\n`;
@@ -1414,7 +1778,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           output += `🎯 Nouvelle norme: ${newNorm.toFixed(6)}\n\n`;
 
           output += `**Vecteur normalisé:**\n`;
-          output += `[${result.slice(0, 10).join(', ')}${n > 10 ? ', ...' : ''}]\n\n`;
+          output += `[${result.slice(0, 10).join(", ")}${n > 10 ? ", ..." : ""}]\n\n`;
 
           output += `📋 **JSON pour insertion:**\n`;
           output += `\`\`\`json\n${JSON.stringify(result)}\n\`\`\`\n\n`;
@@ -1423,8 +1787,8 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_normalize]', error.message);
-          return this.formatError(error, 'Normalisation de vecteur');
+          Logger.error("❌ [pgvector_normalize]", error.message);
+          return this.formatError(error, "Normalisation de vecteur");
         }
       },
     });
@@ -1435,13 +1799,26 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private diagnostic(): void {
     this.server.addTool({
-      name: 'pgvector_diagnostic',
-      description: 'Effectue un diagnostic complet d\'une table vectorielle avec suggestions de correction',
+      name: "pgvector_diagnostic",
+      description:
+        "Effectue un diagnostic complet d'une table vectorielle avec suggestions de correction",
       parameters: z.object({
-        tableName: z.string().describe('Nom de la table à diagnostiquer'),
-        vectorColumn: z.string().optional().default('embedding').describe('Nom de la colonne vectorielle'),
-        schema: z.string().optional().default('public').describe('Schéma de la table'),
-        generateFixScript: z.boolean().optional().default(false).describe('Générer un script SQL de correction'),
+        tableName: z.string().describe("Nom de la table à diagnostiquer"),
+        vectorColumn: z
+          .string()
+          .optional()
+          .default("embedding")
+          .describe("Nom de la colonne vectorielle"),
+        schema: z
+          .string()
+          .optional()
+          .default("public")
+          .describe("Schéma de la table"),
+        generateFixScript: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Générer un script SQL de correction"),
       }),
       execute: async (args) => {
         try {
@@ -1454,12 +1831,15 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           let output = `🔍 **Diagnostic: ${args.schema}.${args.tableName}**\n\n`;
 
           // 1. Vérifier que la table existe
-          const tableCheck = await client.query(`
+          const tableCheck = await client.query(
+            `
             SELECT EXISTS(
               SELECT 1 FROM information_schema.tables
               WHERE table_schema = $1 AND table_name = $2
             ) as exists
-          `, [args.schema, args.tableName]);
+          `,
+            [args.schema, args.tableName],
+          );
 
           if (!tableCheck.rows[0].exists) {
             await client.release();
@@ -1477,7 +1857,8 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           output += `✅ Table existe\n\n`;
 
           // 2. Vérifier la colonne vectorielle
-          const colCheck = await client.query(`
+          const colCheck = await client.query(
+            `
             SELECT
               data_type,
               udt_name,
@@ -1485,12 +1866,18 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
               is_nullable
             FROM information_schema.columns
             WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-          `, [args.schema, args.tableName, args.vectorColumn]);
+          `,
+            [args.schema, args.tableName, args.vectorColumn],
+          );
 
           if (colCheck.rows.length === 0) {
-            issues.push(`Colonne vectorielle "${args.vectorColumn}" non trouvée`);
+            issues.push(
+              `Colonne vectorielle "${args.vectorColumn}" non trouvée`,
+            );
             suggestions.push(`Créez la colonne avec pgvector_create_column`);
-            fixScripts.push(`ALTER TABLE ${fullTableName} ADD COLUMN ${args.vectorColumn} vector(1536);`);
+            fixScripts.push(
+              `ALTER TABLE ${fullTableName} ADD COLUMN ${args.vectorColumn} vector(1536);`,
+            );
           } else {
             const colInfo = colCheck.rows[0];
             output += `✅ Colonne vectorielle: ${colInfo.udt_name}(${colInfo.character_maximum_length}D)\n`;
@@ -1499,9 +1886,9 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             // Vérifier les dimensions standards
             const dims = parseInt(colInfo.character_maximum_length);
             const standardModels: Record<number, string> = {
-              1536: 'OpenAI text-embedding-ada-002',
-              3072: 'OpenAI text-embedding-3-large',
-              384: 'Sentence Transformers (all-MiniLM-L6-v2)'
+              1536: "OpenAI text-embedding-ada-002",
+              3072: "OpenAI text-embedding-3-large",
+              384: "Sentence Transformers (all-MiniLM-L6-v2)",
             };
             if (standardModels[dims]) {
               output += `💡 Correspond probablement à: ${standardModels[dims]}\n\n`;
@@ -1509,13 +1896,16 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           }
 
           // 3. Vérifier les colonnes support (content, metadata)
-          const supportColumns = await client.query(`
+          const supportColumns = await client.query(
+            `
             SELECT column_name, data_type
             FROM information_schema.columns
             WHERE table_schema = $1 AND table_name = $2
               AND column_name IN ('content', 'metadata', 'id')
             ORDER BY column_name
-          `, [args.schema, args.tableName]);
+          `,
+            [args.schema, args.tableName],
+          );
 
           if (supportColumns.rows.length > 0) {
             output += `📋 Colonnes support trouvées:\n`;
@@ -1547,29 +1937,34 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           output += `\n`;
 
           // 5. Vérifier les index
-          const indexCheck = await client.query(`
+          const indexCheck = await client.query(
+            `
             SELECT
               indexname,
               indexdef
             FROM pg_indexes
             WHERE schemaname = $1 AND tablename = $2
               AND indexdef LIKE '%${args.vectorColumn}%'
-          `, [args.schema, args.tableName]);
+          `,
+            [args.schema, args.tableName],
+          );
 
           if (indexCheck.rows.length === 0) {
             output += `⚠️ **Aucun index vectoriel**\n`;
             output += `   ⚠️ Les recherches seront lentes sans index\n\n`;
             issues.push(`Aucun index vectoriel`);
             suggestions.push(`Créez un index HNSW pour des recherches rapides`);
-            fixScripts.push(`CREATE INDEX ${args.tableName}_${args.vectorColumn}_hnsw_idx ON ${fullTableName} USING hnsw (${args.vectorColumn} vector_cosine_ops);`);
+            fixScripts.push(
+              `CREATE INDEX ${args.tableName}_${args.vectorColumn}_hnsw_idx ON ${fullTableName} USING hnsw (${args.vectorColumn} vector_cosine_ops);`,
+            );
           } else {
             output += `✅ **Index vectoriels (${indexCheck.rows.length}):**\n`;
             indexCheck.rows.forEach((idx: any) => {
               output += `   • ${idx.indexname}\n`;
               // Extraire le type d'index
-              if (idx.indexdef.includes('hnsw')) {
+              if (idx.indexdef.includes("hnsw")) {
                 output += `     Type: HNSW (rapide)\n`;
-              } else if (idx.indexdef.includes('ivfflat')) {
+              } else if (idx.indexdef.includes("ivfflat")) {
                 output += `     Type: IVFFlat (compact)\n`;
               }
             });
@@ -1600,27 +1995,27 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           } else {
             output += `\n⚠️ **${issues.length} problème(s) détecté(s)**\n\n`;
             output += `**Problèmes:**\n`;
-            issues.forEach(issue => output += `   ❌ ${issue}\n`);
+            issues.forEach((issue) => (output += `   ❌ ${issue}\n`));
             output += `\n`;
 
             if (suggestions.length > 0) {
               output += `**Suggestions:**\n`;
-              suggestions.forEach(sug => output += `   💡 ${sug}\n`);
+              suggestions.forEach((sug) => (output += `   💡 ${sug}\n`));
             }
 
             // Script de correction
             if (args.generateFixScript && fixScripts.length > 0) {
               output += `\n🔧 **Script de correction SQL:**\n`;
               output += `\`\`\`sql\n`;
-              fixScripts.forEach(script => output += script + '\n');
+              fixScripts.forEach((script) => (output += script + "\n"));
               output += `\`\`\`\n`;
             }
           }
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [pgvector_diagnostic]', error.message);
-          return this.formatError(error, 'Diagnostic');
+          Logger.error("❌ [pgvector_diagnostic]", error.message);
+          return this.formatError(error, "Diagnostic");
         }
       },
     });
@@ -1631,13 +2026,30 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
   // ========================================================================
   private analyzeSlowQueries(): void {
     this.server.addTool({
-      name: 'analyze_slow_queries',
-      description: 'Analyse les requêtes lentes en utilisant pg_stat_statements (nécessite l\'extension)',
+      name: "analyze_slow_queries",
+      description:
+        "Analyse les requêtes lentes en utilisant pg_stat_statements (nécessite l'extension)",
       parameters: z.object({
-        limit: z.number().optional().default(20).describe('Nombre de requêtes à afficher'),
-        minExecutions: z.number().optional().default(5).describe('Nombre minimum d\'exécutions pour être inclus'),
-        orderBy: z.enum(['total_time', 'mean_time', 'calls']).optional().default('total_time').describe('Tri par: total_time, mean_time, ou calls'),
-        includeQuery: z.boolean().optional().default(false).describe('Inclure le texte complet des requêtes (peut être long)'),
+        limit: z
+          .number()
+          .optional()
+          .default(20)
+          .describe("Nombre de requêtes à afficher"),
+        minExecutions: z
+          .number()
+          .optional()
+          .default(5)
+          .describe("Nombre minimum d'exécutions pour être inclus"),
+        orderBy: z
+          .enum(["total_time", "mean_time", "calls"])
+          .optional()
+          .default("total_time")
+          .describe("Tri par: total_time, mean_time, ou calls"),
+        includeQuery: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Inclure le texte complet des requêtes (peut être long)"),
       }),
       execute: async (args) => {
         try {
@@ -1708,9 +2120,9 @@ SHOW shared_preload_libraries;
 
           // Récupérer les statistiques
           const orderByMap: Record<string, string> = {
-            total_time: 'total_exec_time DESC',
-            mean_time: 'mean_exec_time DESC',
-            calls: 'calls DESC'
+            total_time: "total_exec_time DESC",
+            mean_time: "mean_exec_time DESC",
+            calls: "calls DESC",
           };
 
           const query = `
@@ -1728,7 +2140,10 @@ SHOW shared_preload_libraries;
             LIMIT $2
           `;
 
-          const result = await client.query(query, [args.minExecutions, args.limit]);
+          const result = await client.query(query, [
+            args.minExecutions,
+            args.limit,
+          ]);
           await client.release();
 
           if (result.rows.length === 0) {
@@ -1754,7 +2169,7 @@ Aucune requête trouvée avec au moins ${args.minExecutions} exécutions.
             if (args.includeQuery && row.query) {
               let query = row.query;
               if (query.length > 200) {
-                query = query.substring(0, 200) + '...';
+                query = query.substring(0, 200) + "...";
               }
               output += `   \`\`\`sql\n   ${query}\n   \`\`\`\n`;
             }
@@ -1770,8 +2185,8 @@ Aucune requête trouvée avec au moins ${args.minExecutions} exécutions.
 
           return output;
         } catch (error: any) {
-          Logger.error('❌ [analyze_slow_queries]', error.message);
-          return this.formatError(error, 'Analyse des requêtes lentes');
+          Logger.error("❌ [analyze_slow_queries]", error.message);
+          return this.formatError(error, "Analyse des requêtes lentes");
         }
       },
     });
@@ -1782,14 +2197,17 @@ Aucune requête trouvée avec au moins ${args.minExecutions} exécutions.
   // ========================================================================
   private pgvectorHelp(): void {
     this.server.addTool({
-      name: 'pgvector_help',
+      name: "pgvector_help",
       description: `📚 Guide de syntaxe pgvector pour les agents LLM.
 
 IMPORTANT: Utilisez cet outil AVANT d'écrire des requêtes SQL avec des vecteurs!
 Retourne la syntaxe correcte pour pgvector (différente des tableaux PostgreSQL classiques).`,
       parameters: z.object({
-        topic: z.enum(['all', 'create', 'insert', 'search', 'functions', 'errors']).optional().default('all')
-          .describe('Sujet: all, create, insert, search, functions, errors'),
+        topic: z
+          .enum(["all", "create", "insert", "search", "functions", "errors"])
+          .optional()
+          .default("all")
+          .describe("Sujet: all, create, insert, search, functions, errors"),
       }),
       execute: async (args) => {
         let output = `📚 **Guide de Syntaxe pgvector pour LLM**\n\n`;
@@ -1928,15 +2346,15 @@ WHERE table_name = 'documents' AND column_name = 'embedding';
 | 1024 | text-embedding-3-small | OpenAI |
 | 768 | all-mpnet-base-v2 | HuggingFace |
 | 384 | all-MiniLM-L6-v2 | Sentence Transformers |
-`
+`,
         };
 
-        if (args.topic === 'all') {
-          output += topics.create + '\n';
-          output += topics.insert + '\n';
-          output += topics.search + '\n';
-          output += topics.functions + '\n';
-          output += topics.errors + '\n';
+        if (args.topic === "all") {
+          output += topics.create + "\n";
+          output += topics.insert + "\n";
+          output += topics.search + "\n";
+          output += topics.functions + "\n";
+          output += topics.errors + "\n";
         } else {
           output += topics[args.topic];
         }

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL-MCP | Serveur MCP PostgreSQL avec RAG 4096D</title>
+    <meta name="description" content="Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une bibliothèque TypeScript pour l'intelligence sémantique avec embeddings SOTA (Qwen 8B).">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <canvas class="matrix-bg" id="matrix"></canvas>
+    <div class="grid-overlay"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="main-content">
+        <header>
+            <div class="container">
+                <nav>
+                    <div class="logo">
+                        <i class="fas fa-database"></i>
+                        <span class="logo-text">PostgreSQL-MCP</span>
+                        <div class="logo-glitch"></div>
+                    </div>
+                    <ul class="nav-links">
+                        <li><a href="#features" class="nav-link">Fonctionnalités</a></li>
+                        <li><a href="#install" class="nav-link">Installation</a></li>
+                        <li><a href="#library" class="nav-link">Bibliothèque</a></li>
+                        <li><a href="#structure" class="nav-link">Structure</a></li>
+                    </ul>
+                    <div class="mobile-toggle">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </nav>
+            </div>
+        </header>
+
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <i class="fas fa-bolt"></i>
+                        <span>V 1.1.4</span>
+                    </div>
+                    <h1 class="hero-title">
+                        <span class="glitch" data-text="PostgreSQL">PostgreSQL</span>
+                        <span class="gradient-text">MCP</span>
+                    </h1>
+                    <p class="hero-subtitle">
+                        Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une bibliothèque TypeScript pour l'intelligence sémantique avec embeddings SOTA (Qwen 8B).
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#install" class="btn btn-primary">
+                            <i class="fas fa-rocket"></i>
+                            <span>Commencer</span>
+                            <div class="btn-glow"></div>
+                        </a>
+                        <a href="https://discord.gg/4AR82phtBz" target="_blank" class="btn btn-secondary">
+                            <i class="fab fa-discord"></i>
+                            <span>Discord</span>
+                        </a>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <div class="stat-value" data-target="4096">0</div>
+                            <div class="stat-label">Dimensions Mémoire</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" data-target="100">0</div>
+                            <div class="stat-label">% Type-Safe</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" data-target="8">0</div>
+                            <div class="stat-label">Modèles Supportés</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="brain-container">
+                        <div class="brain-core"></div>
+                        <div class="brain-ring ring-1"></div>
+                        <div class="brain-ring ring-2"></div>
+                        <div class="brain-ring ring-3"></div>
+                        <div class="brain-particles"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-microchip"></i>
+                        Fonctionnalités
+                    </h2>
+                    <p class="section-subtitle">La puissance ultime pour vos bases de données PostgreSQL</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-brain"></i>
+                            <div class="icon-bg"></div>
+                        </div>
+                        <h3>Mémoire 4096D</h3>
+                        <p>Système RAG intégré via PostgreSQL + pgvector supportant les embeddings SOTA (Qwen 8B) pour une recherche sémantique ultra-précise.</p>
+                        <div class="feature-border"></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-alt"></i>
+                            <div class="icon-bg"></div>
+                        </div>
+                        <h3>Mémoire Ségréguée</h3>
+                        <p>Chaque agent peut posséder ses propres souvenirs isolés tout en ayant accès au socle de connaissances global.</p>
+                        <div class="feature-border"></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-robot"></i>
+                            <div class="icon-bg"></div>
+                        </div>
+                        <h3>Navigation Autonome</h3>
+                        <p>L'agent interagit naturellement avec la base de données via le modèle d'embedding par défaut, sans SQL complexe.</p>
+                        <div class="feature-border"></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-search"></i>
+                            <div class="icon-bg"></div>
+                        </div>
+                        <h3>Recherche Hybride</h3>
+                        <p>Combinaison puissante de recherche vectorielle et full-text pour des résultats ultra-précis en毫isecondes.</p>
+                        <div class="feature-border"></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-cogs"></i>
+                            <div class="icon-bg"></div>
+                        </div>
+                        <h3>Auto-Embedding</h3>
+                        <p>Génération automatique d'embeddings lors de l'insertion de données avec support multi-modèles (Qwen, OpenAI, etc).</p>
+                        <div class="feature-border"></div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-code"></i>
+                            <div class="icon-bg"></div>
+                        </div>
+                        <h3>Type-Safe</h3>
+                        <p>API entièrement typée avec TypeScript et Zod pour une validation robuste des données et IntelliSense complet.</p>
+                        <div class="feature-border"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="installation" id="install">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-download"></i>
+                        Installation
+                    </h2>
+                </div>
+                <div class="install-tabs">
+                    <button class="tab-btn active" data-tab="mcp">
+                        <i class="fas fa-plug"></i>
+                        Via MCP
+                    </button>
+                    <button class="tab-btn" data-tab="library">
+                        <i class="fas fa-code"></i>
+                        Bibliothèque
+                    </button>
+                    <button class="tab-btn" data-tab="local">
+                        <i class="fas fa-folder"></i>
+                        Locale (Dev)
+                    </button>
+                </div>
+                <div class="tab-content active" id="mcp">
+                    <div class="code-container">
+                        <div class="code-header">
+                            <span class="code-title">Configuration MCP (.mcp.json)</span>
+                            <div class="code-actions">
+                                <button class="copy-btn">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <pre><code class="language-json">{
+  "mcpServers": {
+    "postgresql": {
+      "command": "npx",
+      "args": ["-y", "overmind-postgres-mcp"]
+    }
+  }
+}</code></pre>
+                    </div>
+                    <div class="code-container" style="margin-top: 20px;">
+                        <div class="code-header">
+                            <span class="code-title">Variables d'Environnement (.env)</span>
+                            <div class="code-actions">
+                                <button class="copy-btn">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <pre><code class="language-bash">POSTGRES_URL=postgresql://user:pass@localhost:5432/db
+OPEN_ROUTER_API_KEY=sk-or-v1-...</code></pre>
+                    </div>
+                </div>
+                <div class="tab-content" id="library">
+                    <div class="code-container">
+                        <div class="code-header">
+                            <span class="code-title">Terminal</span>
+                            <div class="code-actions">
+                                <button class="copy-btn">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <pre><code class="language-bash"># Installation
+pnpm add overmind-postgres-mcp</code></pre>
+                    </div>
+                </div>
+                <div class="tab-content" id="local">
+                    <div class="code-container">
+                        <div class="code-header">
+                            <span class="code-title">Terminal</span>
+                            <div class="code-actions">
+                                <button class="copy-btn">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <pre><code class="language-bash"># 1. Cloner le repo
+git clone https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur
+cd serveur_PostGreSQL
+
+# 2. Installer les dépendances
+pnpm install
+
+# 3. Build le projet
+pnpm run build
+
+# 4. Configuration MCP
+{
+  "mcpServers": {
+    "postgresql": {
+      "command": "node",
+      "args": ["PATH/ABSOLU/dist/index.js"]
+    }
+  }
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="library" id="library">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-code"></i>
+                        Utilisation comme Bibliothèque
+                    </h2>
+                </div>
+                <div class="code-container large">
+                    <div class="code-header">
+                        <span class="code-title">TypeScript - Intelligence Sémantique</span>
+                        <div class="code-actions">
+                            <button class="copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <pre><code class="language-typescript">import { embedText } from "overmind-postgres-mcp/services/embeddings";
+import { IntelligentSearchService } from "overmind-postgres-mcp/services/search";
+
+// 1. Générer des embeddings haute qualité
+const { embedding, model } = await embedText("Votre texte ici");
+
+// 2. Recherche hybride vectorielle + full-text
+const searchService = new IntelligentSearchService();
+const results = await searchService.hybridSearch({
+  query: "Comment configurer le serveur ?",
+  table: "documents",
+  mode: "hybrid"
+});
+
+// 3. Gestion de la mémoire 4096D
+const memory = await searchService.storeKnowledge({
+  text: "Nouvelle connaissance critique...",
+  table: "knowledge_base",
+  metadata: { source: "user", priority: "high" }
+});</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="structure" id="structure">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-folder-tree"></i>
+                        Structure du Projet
+                    </h2>
+                </div>
+                <div class="structure-tree">
+                    <div class="tree-item">
+                        <i class="fas fa-cogs"></i>
+                        <span>src/services/</span>
+                        <span class="tree-desc">Embeddings & Recherche intelligente</span>
+                    </div>
+                    <div class="tree-item">
+                        <i class="fas fa-wrench"></i>
+                        <span>src/tools/</span>
+                        <span class="tree-desc">Outils MCP FastMCP</span>
+                    </div>
+                    <div class="tree-item">
+                        <i class="fas fa-database"></i>
+                        <span>migrations/</span>
+                        <span class="tree-desc">Scripts SQL pgvector</span>
+                    </div>
+                    <div class="tree-item">
+                        <i class="fas fa-file-code"></i>
+                        <span>src/config.ts</span>
+                        <span class="tree-desc">Configuration & Zod schemas</span>
+                    </div>
+                    <div class="tree-item">
+                        <i class="fas fa-export"></i>
+                        <span>src/index.ts</span>
+                        <span class="tree-desc">Exports publics (API)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="examples" id="examples">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-lightbulb"></i>
+                        Exemples d'Usage Agent
+                    </h2>
+                </div>
+                <div class="examples-grid">
+                    <div class="example-card">
+                        <div class="example-header">
+                            <i class="fas fa-table"></i>
+                            <h3>Préparer une Table Qwen</h3>
+                        </div>
+                        <div class="code-container">
+                            <pre><code class="language-typescript">use_tool("manage_vectors", {
+  action: "create",
+  table: "knowledge_base",
+  dimensions: 4096
+});</code></pre>
+                        </div>
+                    </div>
+                    <div class="example-card">
+                        <div class="example-header">
+                            <i class="fas fa-plus-circle"></i>
+                            <h3>Insertion Auto-Embedding</h3>
+                        </div>
+                        <div class="code-container">
+                            <pre><code class="language-typescript">use_tool("insert", {
+  table: "knowledge_base",
+  data: { content: "Guide..." },
+  generateEmbedding: true
+});</code></pre>
+                        </div>
+                    </div>
+                    <div class="example-card">
+                        <div class="example-header">
+                            <i class="fas fa-search"></i>
+                            <h3>Recherche Hybride RAG</h3>
+                        </div>
+                        <div class="code-container">
+                            <pre><code class="language-typescript">use_tool("search", {
+  query: "Comment installer ?",
+  table: "knowledge_base",
+  mode: "hybrid"
+});</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="container">
+                <div class="footer-content">
+                    <div class="footer-brand">
+                        <div class="footer-logo">
+                            <i class="fas fa-database"></i>
+                            <span>PostgreSQL-MCP</span>
+                        </div>
+                        <p>Mémoire sémantique haute performance pour vos agents IA</p>
+                    </div>
+                    <div class="footer-social">
+                        <a href="https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur" target="_blank">
+                            <i class="fab fa-github"></i>
+                        </a>
+                        <a href="https://discord.gg/4AR82phtBz" target="_blank">
+                            <i class="fab fa-discord"></i>
+                        </a>
+                        <a href="https://www.npmjs.com/package/overmind-postgres-mcp" target="_blank">
+                            <i class="fab fa-npm"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>Projet propulsé par DeaMoN888 - 2026</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
