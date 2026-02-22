@@ -23,17 +23,28 @@ export class EmbeddingService {
   private cache: Map<string, number[]> = new Map();
   private maxCacheSize = 1000;
 
-  constructor() {
+  constructor(config?: { apiKey?: string; baseURL?: string; model?: string }) {
     // Debug Paths and Env
     Logger.debug(`📂 CWD: ${process.cwd()}`);
     Logger.debug(`📂 Service Dir: ${__dirname}`);
     
-    // Initialiser OpenRouter API si clé disponible
-    const openRouterKey = process.env.OPEN_ROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+    // Priority: 
+    // 1. Programmatic config
+    // 2. Workflow variables (consistency)
+    // 3. PostgreSQL server variables
+    const openRouterKey = config?.apiKey || 
+                          process.env.OVERMIND_EMBEDDING_KEY || 
+                          process.env.OPEN_ROUTER_API_KEY || 
+                          process.env.OPENROUTER_API_KEY;
+
+    const customURL = config?.baseURL || process.env.OVERMIND_EMBEDDING_URL;
+    const customModel = config?.model || process.env.OVERMIND_EMBEDDING_MODEL;
 
     if (openRouterKey) {
       this.apiKey = openRouterKey;
-      Logger.info(`✅ Embedding Service: OpenRouter API Configured (Key len: ${this.apiKey.length})`);
+      if (customURL) this.baseURL = customURL;
+      if (customModel) this.modelName = customModel;
+      Logger.info(`✅ Embedding Service: Programmatic/OpenRouter Configured (Model: ${this.modelName})`);
     } else if (process.env.OPENAI_API_KEY) {
         this.apiKey = process.env.OPENAI_API_KEY;
         this.baseURL = 'https://api.openai.com/v1';
@@ -62,7 +73,7 @@ export class EmbeddingService {
     const {
       model = this.modelName,
       useCache = true,
-      dimensions = 1536 
+      dimensions = 4096 
     } = options;
 
     // 0. Nettoyer
@@ -155,3 +166,15 @@ export class EmbeddingService {
 }
 
 export const embeddingService = new EmbeddingService();
+
+/**
+ * Drop-in helper for OverMind Memory refactoring.
+ */
+export async function embedText(text: string): Promise<{ embedding: number[]; model: string }> {
+  try {
+    const embedding = await embeddingService.generateEmbedding(text);
+    return { embedding, model: (embeddingService as any).modelName };
+  } catch (e) {
+    return { embedding: [], model: 'none' };
+  }
+}

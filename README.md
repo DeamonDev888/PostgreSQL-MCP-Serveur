@@ -1,154 +1,68 @@
-<p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=JetBrains+Mono&size=32&duration=6000&color=5865F2&center=true&vCenter=true&height=60&lines=%F0%9F%90%98+PostgreSQLMCP" alt="PostgreSQL MCP Server">
-</p>
+# PostgreSQL MCP Server & Library
 
-<br>
+A comprehensive Model Context Protocol (MCP) server for PostgreSQL interaction, which also doubles as an importable TypeScript library for intelligent search and embeddings.
 
-<p align="center">
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js"></a>
-  <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
-  <a href="https://zod.dev/"><img src="https://img.shields.io/badge/Zod-F97316?style=for-the-badge&logo=zod&logoColor=white" alt="Zod"></a>
-  <a href="#"><img src="https://img.shields.io/badge/FastMCP-000000?style=for-the-badge&logoColor=white" alt="FastMCP"></a>
-</p>
+## 🚀 Features
 
----
+- **MCP Tool Suite**: 8 high-level tools for database interaction (diagnose, explore, search, query, insert, etc.).
+- **Vector Intelligence**: Native support for `pgvector` with automatic embedding generation (OpenRouter/OpenAI).
+- **Intelligent Search**: Hybrid search (text + vector) with automatic mode detection.
+- **Physical Isolation**: Support for "Database-per-Agent" architecture when used with OverMind.
+- **Resilient**: Graceful fallbacks for missing extensions (vector, trgm).
 
-<p align="center">
-  <img src="assets/mcp_toolkit.png" alt="Core Tools Toolkit" width="400">
-</p>
-
-Un serveur MCP pour interagir avec PostgreSQL.
-
-## 🚀 Démarrage Rapide
-
-### Prérequis
-
-- [Node.js](https://nodejs.org/) (v18 ou plus)
-- [pnpm](https://pnpm.io/) (v8 ou plus)
-- Une base de données PostgreSQL accessible
-
-### Installation
+## 📦 Installation
 
 ```bash
-# Cloner le projet
-git clone https://github.com/DeamonDev888/PostgreSQL-MCP-Serveur.git
-cd PostgreSQL-MCP-Serveur
-
-# Installer les dépendances
-pnpm install
-
-# Configurer la base de données
-cp .env.example .env
-# Éditer .env avec vos paramètres PostgreSQL
-
-# Compiler le projet TypeScript
-pnpm build
-
+pnpm install postgresql-mcp-server
 ```
 
-## ⚙️ Configuration
+## 🛠️ Library Usage
 
-### .mcp.json
+You can import services directly into your TypeScript project:
+
+```typescript
+import { embedText } from "postgresql-mcp-server/services/embeddings";
+
+const { embedding, model } = await embedText("Hello world");
+```
+
+### Configuration
+
+The library uses environment variables or programmatic configuration:
+
+- `OVERMIND_EMBEDDING_URL`: URL to your embedding API (e.g. OpenRouter).
+- `OVERMIND_EMBEDDING_KEY`: Your API key.
+- `OVERMIND_EMBEDDING_MODEL`: The model to use (default: `qwen/qwen3-embedding-8b`).
+
+### Configuration Automatique (.env)
+
+Il est fortement recommandé de ne pas mettre vos mots de passe directement dans le fichier de configuration de Claude. Le serveur charge automatiquement les fichiers `.env` situés :
+
+1. Dans le dossier racine du serveur.
+2. Dans votre dossier de travail actuel.
+
+### 🤖 Usage Serveur MCP
+
+Configurez votre hôte (ex: Claude Desktop ou OverMind) :
 
 ```json
 {
   "mcpServers": {
     "postgresql": {
       "command": "node",
-      "args": ["C:\\Path\\To\\PostgreSQL-MCP-Serveur\\dist\\index.js"]
+      "args": ["/chemin/vers/postgresql-mcp-server/dist/index.js"]
     }
   }
 }
 ```
 
-## 🛠️ Stack
+> [!TIP]
+> Si un fichier `.env` est présent dans `/chemin/vers/postgresql-mcp-server/`, vous n'avez pas besoin de remplir la section `env` de la configuration !
 
-TypeScript • FastMCP • node-postgres • Zod • pnpm
+### 🗄️ Migrations
 
-## 📄 Licence
+Le dossier `migrations/` contient les scripts SQL nécessaires pour préparer votre base de données (notamment pour l'extension `pgvector`). Ces scripts ne sont pas exécutés automatiquement pour éviter toute altération accidentelle de vos données.
+
+## 📜 License
 
 MIT
-
----
-
-## 🔌 Installation de pg_vector
-
-Pour utiliser la recherche vectorielle, installez l'extension pgvector
-avec docker sur Windows
-
-**Windows**
-
-```bash
-# Utiliser l'image officielle avec pgvector préinstallé
-docker pull pgvector/pgvector:pg16
-```
-
-**Linux/Mac**
-
-```bash
-sudo apt install postgresql-16-pgvector
-```
-
----
-
-## 🧠 Intelligence Sémantique (New v1.1)
-
-Le serveur supporte désormais nativement **Qwen3 Embedding 8B** via OpenRouter pour des recherches sémantiques haute précision.
-
-- **Modèle** : `qwen/qwen3-embedding-8b` (4096 dimensions).
-- **Mode Strict** : Pas de données simulées. Si l'API est absente, le service s'arrête.
-- **Configuration** :
-  Ajoutez votre clé API dans `.env` :
-  ```env
-  OPEN_ROUTER_API_KEY=sk-or-v1-...
-  ```
-- **Maintenance** :
-  Script de backfill inclus pour mettre à jour l'historique :
-  `npx tsx src/scripts/backfill_embeddings.ts`
-
----
-
-## 💡 Exemples d'Usage (Agent)
-
-### 1. Préparer une table pour Qwen (4096 dimensions)
-
-```typescript
-use_tool("manage_vectors", {
-  action: "create",
-  table: "knowledge_base",
-  dimensions: 4096, // Standard Qwen 8B
-});
-```
-
-### 2. Sauvegarder un document (Auto-Embedding)
-
-```typescript
-use_tool("insert", {
-  table: "knowledge_base",
-  data: {
-    category: "documentation",
-    title: "Guide d'Installation",
-    content: "Pour installer le système, commencez par cloner le dépôt...",
-    author: "DevTeam",
-  },
-  generateEmbedding: true, // 🪄 Génère le vecteur 4096d automatiquement
-});
-```
-
-### 3. Recherche de contexte (RAG)
-
-```typescript
-use_tool("search", {
-  query: "Comment installer le système ?",
-  table: "knowledge_base",
-  mode: "hybrid",
-  topK: 5,
-});
-```
-
----
-
-## 📦 Outils Disponibles
-
-Liste complète des 9 outils Core simplifiés : [Voir la documentation des outils](docs/liste_outils.md)
