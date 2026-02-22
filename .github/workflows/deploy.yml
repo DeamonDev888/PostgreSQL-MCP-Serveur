@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main, docs-serveur-postgresql ]
+    branches: [ master, main, docs-serveur-postgresql ]
     paths:
       - 'docs/**'
   workflow_dispatch:
