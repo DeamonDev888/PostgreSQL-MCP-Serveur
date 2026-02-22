@@ -174,7 +174,7 @@ export async function embedText(text: string): Promise<{ embedding: number[]; mo
   try {
     const embedding = await embeddingService.generateEmbedding(text);
     return { embedding, model: (embeddingService as any).modelName };
-  } catch (e) {
+  } catch {
     return { embedding: [], model: 'none' };
   }
 }
