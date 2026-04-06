@@ -6,6 +6,21 @@ import config, { dbConfig } from "./config.js";
 import Logger from "./utils/logger.js";
 import { CoreTools } from "./tools/coreTools.js";
 
+// 🛡️ SHIELD: Protect stdout from pollution (prevents EOF/handshake errors)
+const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = (
+  chunk: any,
+  encoding?: any,
+  callback?: any,
+): boolean => {
+  const str = typeof chunk === "string" ? chunk : chunk.toString();
+  // Only allow JSON-RPC strings (starting with {) to go through stdout
+  if (!str.trim().startsWith("{")) {
+    return process.stderr.write(chunk, encoding, callback);
+  }
+  return originalStdoutWrite(chunk, encoding, callback);
+};
+
 /**
  * Singleton MCP Server instance
  */
@@ -89,44 +104,62 @@ export { default as config, dbConfig, postgresConfig } from "./config.js";
 
 // If this file is run directly, start the server
 async function runServer() {
-  Logger.debug(`📂 CWD: ${process.cwd()}`);
-  Logger.debug(`📂 Service Dir: ${import.meta.url}`);
-  Logger.info("🚀 Démarrage PostgreSQL MCP Server v1.0.0...\n");
   try {
-    const testPool = getPool();
-    const client = await testPool.connect();
-    await client.query("SELECT 1");
-    await client.release();
-    updateGlobalState(true);
+    // 1. Log startup info to logs file (NOT stdout)
+    Logger.debug(`📂 CWD: ${process.cwd()}`);
+    Logger.debug(`📂 Service Dir: ${import.meta.url}`);
 
-    // Register tools
+    // 2. Register tools before starting
     const coreTools = new CoreTools(getPool(), server);
     coreTools.registerTools();
 
-    Logger.info("✅ Connexion PostgreSQL établie\n");
+    // 3. Start the MCP server IMMEDIATELY to answer the "initialize" request
+    // FastMCP.start() handles the stdio/sse transport connection
     await server.start();
-    Logger.info("✅ Serveur MCP démarré\n");
-    Logger.info("📊 Serveur PostgreSQL MCP prêt:");
-    Logger.info(`   • Base: ${dbConfig.POSTGRES_DATABASE}`);
-    Logger.info(
-      `   • Hôte: ${dbConfig.POSTGRES_HOST}:${dbConfig.POSTGRES_PORT}`,
-    );
-    Logger.info(
-      `   • SSL: ${config.database.ssl !== false ? "Activé" : "Désactivé"}`,
-    );
-    Logger.info(`   • Outils: 8 (Core Tools)`);
+    Logger.info("✅ Serveur MCP démarré sur stdio\n");
+
+    // 4. Perform DB connection check in the background
+    // This prevents "initialize: EOF" if the DB is slow or credentials are wrong
+    setTimeout(async () => {
+      try {
+        const testPool = getPool();
+        const client = await testPool.connect();
+        await client.query("SELECT 1");
+        await client.release();
+        updateGlobalState(true);
+        Logger.info(
+          `✅ Connexion PostgreSQL validée: ${dbConfig.POSTGRES_DATABASE}`,
+        );
+      } catch (error: any) {
+        Logger.error("❌ Échec de connexion DB initiale:", error.message);
+        updateGlobalState(false, error.message);
+      }
+    }, 100);
   } catch (error: any) {
-    Logger.error("❌ Erreur fatale au démarrage:", error);
+    // Crucial: errors in runServer must go to stderr to avoid corrupting stdout
+    process.stderr.write(`❌ Erreur fatale au démarrage: ${error.message}\n`);
     await cleanup();
     process.exit(1);
   }
 }
 
-// Simple check for CLI execution in ESM
-const normalizedArgv = process.argv[1]?.replace(/\\/g, "/");
+// ----------------------------------------------------------------------------
+// ROBUST MAIN ENTRY DETECTION (ESM + WINDOWS)
+// ----------------------------------------------------------------------------
+import url from "url";
+const currentFilePath = url
+  .fileURLToPath(import.meta.url)
+  .replace(/\\/g, "/")
+  .toLowerCase();
+const entryPath = process.argv[1]?.replace(/\\/g, "/").toLowerCase();
+
 const isMain =
-  normalizedArgv?.includes("dist/index.js") ||
-  normalizedArgv?.includes("src/index.ts");
+  entryPath &&
+  (currentFilePath.includes(entryPath) ||
+    entryPath.includes(currentFilePath) ||
+    entryPath.endsWith("dist/index.js") ||
+    entryPath.endsWith("src/index.ts"));
+
 if (isMain) {
   process.on("SIGINT", async () => {
     await cleanup();

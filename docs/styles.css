@@ -127,8 +127,9 @@ header {
     position: relative;
     width: 100%;
     z-index: 1000;
-    background: rgba(10, 10, 15, 0.8);
-    backdrop-filter: blur(20px);
+    background: rgba(10, 10, 15, 0.7);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
     border-bottom: 1px solid rgba(0, 255, 136, 0.1);
     transition: all 0.3s ease;
 }
@@ -498,23 +499,38 @@ nav {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 140px;
-    height: 140px;
-    background: rgba(51, 103, 145, 0.1);
-    border: 2px solid var(--neon-green);
-    border-radius: 20px;
+    width: 160px;
+    height: 160px;
+    background: rgba(51, 103, 145, 0.15);
+    border: 2px solid var(--neon-cyan);
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10;
-    box-shadow: 0 0 40px var(--neon-green), inset 0 0 20px var(--neon-green);
-    animation: coreVibrate 5s ease-in-out infinite;
+    box-shadow: 0 0 50px rgba(0, 255, 245, 0.4), inset 0 0 30px rgba(0, 255, 245, 0.2);
+    animation: coreVibrate 10s ease-in-out infinite;
+    backdrop-filter: blur(5px);
+}
+
+.database-core::before {
+    content: '';
+    position: absolute;
+    width: 120%;
+    height: 120%;
+    border: 1px dashed var(--neon-green);
+    border-radius: 50%;
+    animation: spin 20s linear infinite;
+    opacity: 0.3;
 }
 
 .database-core i {
-    font-size: 4rem;
-    color: var(--neon-green);
-    text-shadow: 0 0 20px var(--neon-green);
+    font-size: 4.5rem;
+    background: var(--gradient-postgres);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.5));
 }
 
 @keyframes coreVibrate {
@@ -546,8 +562,8 @@ nav {
 .wave-3 { width: 160px; height: 160px; animation: wavePulse 3s linear infinite 2s; }
 
 @keyframes wavePulse {
-    0% { width: 140px; height: 140px; opacity: 0.5; }
-    100% { width: 300px; height: 300px; opacity: 0; }
+    0% { width: 140px; height: 140px; opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+    100% { width: 400px; height: 400px; opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
 }
 
 /* Vector Particles */
@@ -580,18 +596,21 @@ nav {
 /* Terminal Overlay */
 .terminal-overlay {
     position: absolute;
-    top: 20px;
-    right: -60px;
-    background: rgba(10, 10, 15, 0.8);
-    border: 1px solid var(--neon-green);
-    padding: 15px;
+    bottom: -20px;
+    right: 0;
+    background: rgba(10, 10, 15, 0.9);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    padding: 20px;
     font-family: 'Fira Code', monospace;
     font-size: 0.85rem;
     color: var(--neon-green);
     pointer-events: none;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    animation: terminalFloat 6s ease-in-out infinite;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+    animation: terminalFloat 8s ease-in-out infinite;
+    border-radius: 12px;
+    z-index: 20;
+    min-width: 250px;
 }
 
 .term-line {
@@ -1275,5 +1294,21 @@ footer {
         flex-direction: column;
         text-align: center;
         gap: 30px;
+    }
+
+    .relational-nexus {
+        transform: scale(0.7);
+        margin-bottom: -50px;
+    }
+}
+
+@media (max-width: 480px) {
+    .relational-nexus {
+        transform: scale(0.6);
+        margin-bottom: -100px;
+    }
+    
+    .hero-title {
+        font-size: 2.5rem;
     }
 }
