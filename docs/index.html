@@ -28,7 +28,6 @@
                         <li><a href="#features" class="nav-link">Fonctionnalités</a></li>
                         <li><a href="#install" class="nav-link">Installation</a></li>
                         <li><a href="#library" class="nav-link">Bibliothèque</a></li>
-                        <li><a href="#structure" class="nav-link">Structure</a></li>
                         <li><a href="#advanced" class="nav-link">Exemples</a></li>
                         <li><a href="https://deamondev888.github.io/overmind-mcp/" target="_blank" class="nav-link nav-link-highlight"><i class="fas fa-brain"></i> OverMind-MCP</a></li>
                     </ul>
@@ -207,10 +206,6 @@ pnpm add -g overmind-postgres-mcp</code></pre>
                         <i class="fas fa-plug"></i>
                         Via MCP
                     </button>
-                    <button class="tab-btn" data-tab="library">
-                        <i class="fas fa-code"></i>
-                        Bibliothèque
-                    </button>
                     <button class="tab-btn" data-tab="local">
                         <i class="fas fa-folder"></i>
                         Locale (Dev)
@@ -246,20 +241,6 @@ pnpm add -g overmind-postgres-mcp</code></pre>
                         </div>
                         <pre><code class="language-bash">POSTGRES_URL=postgresql://user:pass@localhost:5432/db
 OPEN_ROUTER_API_KEY=sk-or-v1-...</code></pre>
-                    </div>
-                </div>
-                <div class="tab-content" id="library">
-                    <div class="code-container">
-                        <div class="code-header">
-                            <span class="code-title">Terminal</span>
-                            <div class="code-actions">
-                                <button class="copy-btn">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <pre><code class="language-bash"># Installation
-pnpm add overmind-postgres-mcp</code></pre>
                     </div>
                 </div>
                 <div class="tab-content" id="local">
@@ -333,44 +314,6 @@ const memory = await searchService.storeKnowledge({
   table: "knowledge_base",
   metadata: { source: "user", priority: "high" }
 });</code></pre>
-                </div>
-            </div>
-        </section>
-
-        <section class="structure" id="structure">
-            <div class="container">
-                <div class="section-header">
-                    <h2 class="section-title">
-                        <i class="fas fa-folder-tree"></i>
-                        Structure du Projet
-                    </h2>
-                </div>
-                <div class="structure-tree">
-                    <div class="tree-item">
-                        <i class="fas fa-cogs"></i>
-                        <span>src/services/</span>
-                        <span class="tree-desc">Embeddings & Recherche intelligente</span>
-                    </div>
-                    <div class="tree-item">
-                        <i class="fas fa-wrench"></i>
-                        <span>src/tools/</span>
-                        <span class="tree-desc">Outils MCP FastMCP</span>
-                    </div>
-                    <div class="tree-item">
-                        <i class="fas fa-database"></i>
-                        <span>migrations/</span>
-                        <span class="tree-desc">Scripts SQL pgvector</span>
-                    </div>
-                    <div class="tree-item">
-                        <i class="fas fa-file-code"></i>
-                        <span>src/config.ts</span>
-                        <span class="tree-desc">Configuration & Zod schemas</span>
-                    </div>
-                    <div class="tree-item">
-                        <i class="fas fa-export"></i>
-                        <span>src/index.ts</span>
-                        <span class="tree-desc">Exports publics (API)</span>
-                    </div>
                 </div>
             </div>
         </section>
