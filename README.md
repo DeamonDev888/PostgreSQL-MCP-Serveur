@@ -29,6 +29,18 @@ Un serveur MCP performant pour interagir avec PostgreSQL, doublé d'une biblioth
 - **🛡️ Mémoire Ségréguée** : Chaque agent peut posséder ses propres souvenirs isolés tout en ayant accès au socle de connaissances global.
 - **🤖 Navigation Autonome** : L'agent interagit naturellement avec la base de données via le modèle d'embedding par défaut, sans avoir besoin d'écrire des requêtes SQL complexes (sauf cas spécifique).
 
+## 📦 Installation
+
+Installez le serveur MCP PostgreSQL via npm ou pnpm :
+
+```bash
+# Via npm
+npm install -g overmind-postgres-mcp
+
+# Via pnpm (recommandé)
+pnpm add -g overmind-postgres-mcp
+```
+
 ## 🚀 Démarrage Rapide (Usage MCP)
 
 La façon la plus simple d'utiliser ce serveur est de le configurer comme un serveur MCP dans votre client préféré (Claude_code, Antigravity, etc.).
