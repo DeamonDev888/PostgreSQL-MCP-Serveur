@@ -39,8 +39,8 @@ class Logger {
     // console.error(message);
   }
 
-  info(..._args: any[]): void {
-    // this.writeLog('INFO', ..._args);
+  info(...args: any[]): void {
+    this.writeLog("INFO", ...args);
   }
 
   warn(...args: any[]): void {

@@ -8,13 +8,21 @@ canvas.height = window.innerHeight;
 const chars = '0123456789ABCDEF@#$%&*PGVECTOR';
 const charArray = chars.split('');
 
-const fontSize = 14;
-const columns = canvas.width / fontSize;
+const fontSize = 16;
+let columns = canvas.width / fontSize;
+let drops = [];
 
-const drops = [];
-for (let i = 0; i < columns; i++) {
-    drops[i] = 1;
+function initMatrix() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    columns = Math.floor(canvas.width / fontSize);
+    drops = [];
+    for (let i = 0; i < columns; i++) {
+        drops[i] = Math.random() * -100;
+    }
 }
+
+initMatrix();
 
 function drawMatrix() {
     ctx.fillStyle = 'rgba(10, 10, 15, 0.05)';
@@ -25,6 +33,11 @@ function drawMatrix() {
 
     for (let i = 0; i < drops.length; i++) {
         const text = charArray[Math.floor(Math.random() * charArray.length)];
+        
+        // Varying brightness
+        const opacity = Math.random() > 0.9 ? 1 : 0.6;
+        ctx.fillStyle = `rgba(0, 255, 136, ${opacity})`;
+        
         ctx.fillText(text, i * fontSize, drops[i] * fontSize);
 
         if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
@@ -38,8 +51,7 @@ setInterval(drawMatrix, 50);
 
 // Resize handler
 window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    initMatrix();
 });
 
 // Tab functionality
@@ -246,7 +258,7 @@ const latticeContainer = document.getElementById('relational-lattice');
 
 if (nexus) {
     const nodes = [];
-    const numNodes = 20;
+    const numNodes = 35; // Plus dense
     const centerX = 250;
     const centerY = 250;
 
