@@ -134,7 +134,7 @@ export class EmbeddingService {
             "HTTP-Referer": "https://sentinel-bot.local",
             "X-Title": "Sentinel Market AI",
           },
-          timeout: 15000, // Increased timeout for Qwen
+          timeout: 10000, // Timeout optimisé pour Qwen (10s)
         },
       );
 
