@@ -178,13 +178,15 @@ export class IntelligentSearchService {
       return "hybrid";
     }
 
-    // Par défaut: vecteur
-    return "vector";
+    // Par défaut: hybride pour équilibre précision/vitesse
+    return "hybrid";
   }
 
   /**
    * Recherche avec vecteur aléatoire
    */
+  private readonly VECTOR_DIMENSIONS = 4096; // Standard Qwen 8B
+
   private async performRandomSearch(
     tableName: string,
     topK: number,
@@ -192,9 +194,9 @@ export class IntelligentSearchService {
     const client = await this.pool.connect();
 
     try {
-      // Générer un vecteur aléatoire 768D
+      // Générer un vecteur aléatoire 4096D (Qwen 8B standard)
       const randomVector = [];
-      for (let i = 0; i < 768; i++) {
+      for (let i = 0; i < this.VECTOR_DIMENSIONS; i++) {
         randomVector.push(Math.random() * 2 - 1);
       }
 
@@ -223,8 +225,11 @@ export class IntelligentSearchService {
   }
 
   /**
-   * Recherche vecteur seule
+   * Recherche vecteur seule avec cache LRU
    */
+  private vectorCache: Map<string, { results: any[]; timestamp: number }> = new Map();
+  private readonly VECTOR_CACHE_TTL = 300000; // 5 minutes en ms
+
   private async performVectorSearch(
     query: string,
     tableName: string,
@@ -234,13 +239,31 @@ export class IntelligentSearchService {
     const client = await this.pool.connect();
 
     try {
+      // Vérifier cache LRU d'abord
+      const cacheKey = `${tableName}:${query}:${topK}`;
+      const now = Date.now();
+
+      if (useCache && this.vectorCache.has(cacheKey)) {
+        const cached = this.vectorCache.get(cacheKey)!;
+        if (now - cached.timestamp < this.VECTOR_CACHE_TTL) {
+          Logger.debug(`📦 Vector Cache Hit: ${cacheKey}`);
+          return {
+            results: cached.results,
+            metadata: { cachedAt: cached.timestamp },
+            fromCache: true
+          };
+        } else {
+          this.vectorCache.delete(cacheKey); // Cache expiré
+        }
+      }
+
       // Générer l'embedding
       const embedding = await embeddingService.generateEmbedding(query, {
         useCache,
       });
 
-      // Vérifier si vient du cache
-      const fromCache = false; // Note: Cette vérification pourrait être améliorée avec un cache LRU
+      // Vérifier si vient du cache d'embeddings
+      const fromCache = false;
 
       // Recherche
       const results = await client.query(
@@ -253,6 +276,21 @@ export class IntelligentSearchService {
         [`[${embedding.join(",")}]`, topK],
       );
 
+      // Mettre en cache les résultats
+      if (useCache) {
+        this.vectorCache.set(cacheKey, {
+          results: results.rows,
+          timestamp: now
+        });
+
+        // Nettoyer le cache si trop grand
+        if (this.vectorCache.size > 100) {
+          const oldestKey = [...this.vectorCache.entries()]
+            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+          this.vectorCache.delete(oldestKey);
+        }
+      }
+
       return {
         results: results.rows,
         metadata: {
@@ -264,6 +302,14 @@ export class IntelligentSearchService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Nettoie le cache vecteur
+   */
+  clearVectorCache(): void {
+    this.vectorCache.clear();
+    Logger.info("🧹 Cache vecteur vidé");
   }
 
   /**
