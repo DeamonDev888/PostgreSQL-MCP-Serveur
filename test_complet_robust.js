@@ -28,13 +28,13 @@ let coreTools;
  */
 async function testInitialization() {
   try {
-    // Configuration de test
+    // Configuration de test - Support both POSTGRES_* and PG* prefixes for flexibility
     const config = {
-      host: process.env.PGHOST || 'localhost',
-      port: parseInt(process.env.PGPORT) || 5432,
-      database: process.env.PGDATABASE || 'postgres',
-      user: process.env.PGUSER || 'postgres',
-      password: process.env.PGPASSWORD || 'postgres'
+      host: process.env.POSTGRES_HOST || process.env.PGHOST || 'localhost',
+      port: parseInt(process.env.POSTGRES_PORT || process.env.PGPORT) || 5432,
+      database: process.env.POSTGRES_DATABASE || process.env.PGDATABASE || 'financial_analyst',
+      user: process.env.POSTGRES_USER || process.env.PGUSER || 'postgres',
+      password: process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD || 'postgres'
     };
 
     pool = new Pool(config);
