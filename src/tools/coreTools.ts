@@ -364,25 +364,14 @@ MCP_PG_VECTOR({
 
             // Pour les mutations (INSERT, UPDATE, DELETE)
             if (isMutationQuery) {
+              // Si RETURNING utilisé, on retourne le JSON brut comme pour SELECT
+              if (result.rows && result.rows.length > 0) {
+                return JSON.stringify(result.rows);
+              }
+
               let output = `✅ **${queryType} exécuté avec succès**\n\n`;
               output += `⏱️ Durée: ${duration}ms\n`;
               output += `📊 Lignes affectées: ${result.rowCount || 0}\n`;
-
-              // Si RETURNING utilisé, afficher les données retournées
-              if (result.rows && result.rows.length > 0) {
-                output += `\n📋 **Données retournées:**\n`;
-                const headers = Object.keys(result.rows[0]);
-                output += `| ${headers.join(" | ")} |\n`;
-                output += `|${headers.map(() => "---").join("|")}|\n`;
-                result.rows.slice(0, 5).forEach((row: any) => {
-                  const values = headers.map((h: string) => {
-                    const val = row[h];
-                    if (val === null) return "NULL";
-                    return String(val).substring(0, 100);
-                  });
-                  output += `| ${values.join(" | ")} |\n`;
-                });
-              }
 
               output += `\n💡 **Prochaine action suggérée:**\n`;
               if (queryType === "INSERT") {
