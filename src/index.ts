@@ -6,20 +6,22 @@ import config, { dbConfig } from "./config.js";
 import Logger from "./utils/logger.js";
 import { CoreTools } from "./tools/coreTools.js";
 
-// 🛡️ SHIELD: Protect stdout from pollution (prevents EOF/handshake errors)
-const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-process.stdout.write = (
-  chunk: any,
-  encoding?: any,
-  callback?: any,
-): boolean => {
-  const str = typeof chunk === "string" ? chunk : chunk.toString();
-  // Only allow JSON-RPC strings (starting with {) to go through stdout
-  if (!str.trim().startsWith("{")) {
-    return process.stderr.write(chunk, encoding, callback);
-  }
-  return originalStdoutWrite(chunk, encoding, callback);
+// Force all console.log to console.error to avoid breaking MCP protocol (stdio)
+console.log = (...args) => {
+  console.error(...args);
 };
+
+// 🚑 Emergency Recovery: Handle unhandled errors to log them before exiting
+process.on("uncaughtException", (error) => {
+  Logger.error("🔥 UNCAUGHT EXCEPTION:", error);
+  process.stderr.write(`Fata Error: ${error.message}\n`);
+  setTimeout(() => process.exit(1), 100);
+});
+
+process.on("unhandledRejection", (reason) => {
+  Logger.error("🌊 UNHANDLED REJECTION:", reason);
+  process.stderr.write(`Unhandled Rejection: ${reason}\n`);
+});
 
 /**
  * Singleton MCP Server instance
