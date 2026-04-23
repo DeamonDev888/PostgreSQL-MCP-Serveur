@@ -132,6 +132,16 @@ async function runServer() {
         Logger.info(
           `✅ Connexion PostgreSQL validée: ${dbConfig.POSTGRES_DATABASE}`,
         );
+        
+        // 5. Audit Loop: Log pool connection saturation every 5 minutes (INC-A1)
+        setInterval(() => {
+          if (globalState.connectionCount > 10) {
+            Logger.warn(`⚠️ [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount} (Max allowed: ${config.database.max})`);
+          } else {
+            Logger.debug(`📊 [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount}`);
+          }
+        }, 5 * 60 * 1000);
+        
       } catch (error: any) {
         Logger.error("❌ Échec de connexion DB initiale:", error.message);
         updateGlobalState(false, error.message);
