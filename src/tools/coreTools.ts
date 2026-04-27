@@ -7,7 +7,6 @@ import Logger from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 import { embeddingService } from "../services/embeddingService.js";
 import { DBOptimizer } from "../utils/dbOptimizer.js";
-import { validateIdentifier, validateTopK } from "../utils/sqlValidator.js";
 
 /**
  * Outils MCP Core - Refactorisation pour cohérence et simplicité
@@ -455,7 +454,7 @@ MCP_PG_VECTOR({
           .enum(["auto", "text", "vector", "hybrid"])
           .default("auto")
           .describe("Mode de recherche (auto = détecte automatiquement)"),
-        topK: z.number().default(10).max(1000).describe("Nombre de résultats"),
+        topK: z.number().max(1000).default(10).describe("Nombre de résultats"),
         embed: z
           .boolean()
           .default(true)

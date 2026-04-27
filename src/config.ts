@@ -57,9 +57,11 @@ if (!configResult.success) {
   console.error(JSON.stringify(configResult.error.format(), null, 2));
 }
 
-export const dbConfig = configResult.success
+type DbConfig = z.infer<typeof ConfigSchema>;
+
+export const dbConfig: DbConfig = configResult.success
   ? configResult.data
-  : ({
+  : {
       POSTGRES_HOST: "localhost",
       POSTGRES_PORT: 5432,
       POSTGRES_USER: "",
@@ -70,7 +72,7 @@ export const dbConfig = configResult.success
       POSTGRES_IDLE_TIMEOUT: 30000,
       NODE_ENV: "development",
       POSTGRES_CONNECTION_STRING: undefined,
-    } as Record<string, unknown>);
+    };
 
 // Construire la configuration de connexion
 const sslConfig = dbConfig.POSTGRES_SSL

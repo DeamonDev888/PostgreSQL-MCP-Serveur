@@ -1,5 +1,4 @@
 const VALID_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-const VALID_DIMENSIONS = /^(4096|1536|3072|1024|768|384|512|256|128|64|32|16)$/;
 
 export function validateIdentifier(
   name: string,
