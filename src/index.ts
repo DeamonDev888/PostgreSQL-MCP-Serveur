@@ -14,7 +14,7 @@ console.log = (...args) => {
 // 🚑 Emergency Recovery: Handle unhandled errors to log them before exiting
 process.on("uncaughtException", (error) => {
   Logger.error("🔥 UNCAUGHT EXCEPTION:", error);
-  process.stderr.write(`Fata Error: ${error.message}\n`);
+  process.stderr.write(`Fatal Error: ${error.message}\n`);
   setTimeout(() => process.exit(1), 100);
 });
 
@@ -35,7 +35,7 @@ let pool: Pool | null = null;
 
 const globalState = {
   isConnected: false,
-  connectionInfo: null as any,
+  connectionInfo: null as Record<string, unknown> | null,
   lastError: null as string | null,
   connectionCount: 0,
 };
@@ -132,16 +132,23 @@ async function runServer() {
         Logger.info(
           `✅ Connexion PostgreSQL validée: ${dbConfig.POSTGRES_DATABASE}`,
         );
-        
+
         // 5. Audit Loop: Log pool connection saturation every 5 minutes (INC-A1)
-        setInterval(() => {
-          if (globalState.connectionCount > 10) {
-            Logger.warn(`⚠️ [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount} (Max allowed: ${config.database.max})`);
-          } else {
-            Logger.debug(`📊 [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount}`);
-          }
-        }, 5 * 60 * 1000);
-        
+        const auditInterval = setInterval(
+          () => {
+            if (globalState.connectionCount > 10) {
+              Logger.warn(
+                `⚠️ [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount} (Max allowed: ${config.database.max})`,
+              );
+            } else {
+              Logger.debug(
+                `📊 [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount}`,
+              );
+            }
+          },
+          5 * 60 * 1000,
+        );
+        auditInterval.unref();
       } catch (error: any) {
         Logger.error("❌ Échec de connexion DB initiale:", error.message);
         updateGlobalState(false, error.message);

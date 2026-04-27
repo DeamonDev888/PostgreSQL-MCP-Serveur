@@ -7,6 +7,7 @@ import Logger from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 import { embeddingService } from "../services/embeddingService.js";
 import { DBOptimizer } from "../utils/dbOptimizer.js";
+import { validateIdentifier, validateTopK } from "../utils/sqlValidator.js";
 
 /**
  * Outils MCP Core - Refactorisation pour cohérence et simplicité
@@ -59,9 +60,8 @@ export class CoreTools {
           .describe("Diagnostic approfondi avec suggestions"),
       }),
       execute: async (args) => {
+        const client = await this.pool.connect();
         try {
-          const client = await this.pool.connect();
-
           // 1. Diagnostic de connexion
           if (args.type === "connection" || args.type === "all") {
             const connResult = await client.query(
@@ -75,7 +75,6 @@ export class CoreTools {
             output += `📋 Version: ${connResult.rows[0].version.split(" ")[0]} ${connResult.rows[0].version.split(" ")[1]}\n\n`;
 
             if (args.type === "connection") {
-              await client.release();
               return output;
             }
           }
@@ -119,7 +118,6 @@ export class CoreTools {
               // pg_stat_statements non activé
             }
 
-            await client.release();
             return perfOutput;
           }
 
@@ -127,6 +125,8 @@ export class CoreTools {
         } catch (error: any) {
           Logger.error("❌ [diagnose]", error.message);
           return `❌ Erreur: ${error.message}`;
+        } finally {
+          client.release();
         }
       },
     });
@@ -149,9 +149,8 @@ export class CoreTools {
         includeSize: z.boolean().default(false).describe("Inclure les tailles"),
       }),
       execute: async (args) => {
+        const client = await this.pool.connect();
         try {
-          const client = await this.pool.connect();
-
           switch (args.type) {
             case "databases": {
               const result = await client.query(`
@@ -168,7 +167,6 @@ export class CoreTools {
                 )
                 .join("\n");
 
-              await client.release();
               return `📊 **Bases de données** (${result.rows.length}):\n\n${databases}`;
             }
 
@@ -191,7 +189,6 @@ export class CoreTools {
                 })
                 .join("\n");
 
-              await client.release();
               return `📋 **Tables du schéma '${schema}'** (${result.rows.length}):\n\n${tables}`;
             }
 
@@ -222,7 +219,6 @@ export class CoreTools {
                 })
                 .join("\n");
 
-              await client.release();
               return `📋 **Structure de '${tableName}'** (${result.rows.length} colonnes):\n\n${columns}`;
             }
 
@@ -234,8 +230,6 @@ export class CoreTools {
               const tablesResult = await client.query(`
                 SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'public'
               `);
-
-              await client.release();
 
               return (
                 `🗺️ **Structure de la Base**\n\n` +
@@ -251,6 +245,8 @@ export class CoreTools {
         } catch (error: any) {
           Logger.error("❌ [explore]", error.message);
           return `❌ Erreur: ${error.message}`;
+        } finally {
+          client.release();
         }
       },
     });
@@ -459,7 +455,7 @@ MCP_PG_VECTOR({
           .enum(["auto", "text", "vector", "hybrid"])
           .default("auto")
           .describe("Mode de recherche (auto = détecte automatiquement)"),
-        topK: z.number().default(10).describe("Nombre de résultats"),
+        topK: z.number().default(10).max(1000).describe("Nombre de résultats"),
         embed: z
           .boolean()
           .default(true)
