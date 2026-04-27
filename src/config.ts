@@ -9,6 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Charger les variables d'environnement de manière robuste
+// Note: Les chemins vers Workflow/ sont présents pour la compatibilité
+// avec l'architecture multi-projets Overmind. Retirez-les si ce serveur
+// est utilisé de manière autonome.
 const searchPaths = [
   resolve(__dirname, "../../.env"), // dist/../.. -> root du projet
   resolve(__dirname, "../.env"), // dist/.. -> package root
@@ -55,6 +58,9 @@ if (!configResult.success) {
     "⚠️ [postgresql-mcp-server] Configuration invalide ou incomplète:",
   );
   console.error(JSON.stringify(configResult.error.format(), null, 2));
+  if (process.env.NODE_ENV !== "test") {
+    process.exit(1);
+  }
 }
 
 type DbConfig = z.infer<typeof ConfigSchema>;
@@ -70,7 +76,7 @@ export const dbConfig: DbConfig = configResult.success
       POSTGRES_SSL: false,
       POSTGRES_MAX_CONNECTIONS: 10,
       POSTGRES_IDLE_TIMEOUT: 30000,
-      NODE_ENV: "development",
+      NODE_ENV: "test" as const,
       POSTGRES_CONNECTION_STRING: undefined,
     };
 

@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import Logger from "../utils/logger.js";
 import { embeddingService } from "./embeddingService.js";
 import { HybridSearchService } from "./hybridSearchService.js";
+import { validateTableName } from "../utils/sqlValidator.js";
 
 /**
  * Service de recherche intelligent
@@ -158,9 +159,9 @@ export class IntelligentSearchService {
       query.includes("benchmark")
     ) {
       Logger.info(
-        "💡 Utilisez pgvector_search avec useRandomVector: true pour les tests",
+        "💡 Mode test détecté - utilisation de la recherche textuelle",
       );
-      return "text"; // Mode par défaut pour les tests dans intelligent_search
+      return "text";
     }
 
     // Requête très courte - full-text suffisant
@@ -185,12 +186,13 @@ export class IntelligentSearchService {
   /**
    * Recherche avec vecteur aléatoire
    */
-  private readonly VECTOR_DIMENSIONS = 4096; // Standard Qwen 8B
+  private readonly VECTOR_DIMENSIONS = 4096; // Default, overridden by embeddingService model
 
   private async performRandomSearch(
     tableName: string,
     topK: number,
   ): Promise<any[]> {
+    const safeTable = validateTableName(tableName);
     const client = await this.pool.connect();
 
     try {
@@ -210,7 +212,7 @@ export class IntelligentSearchService {
       const results = await client.query(
         `
         SELECT *, 1 - (embedding <=> $1::vector) as similarity
-        FROM ${tableName}
+        FROM ${safeTable}
         ORDER BY embedding <=> $1::vector
         LIMIT $2
         `,
@@ -227,8 +229,9 @@ export class IntelligentSearchService {
   /**
    * Recherche vecteur seule avec cache LRU
    */
-  private vectorCache: Map<string, { results: any[]; timestamp: number }> = new Map();
-  private readonly VECTOR_CACHE_TTL = 300000; // 5 minutes en ms
+  private vectorCacheTTL: Map<string, { results: any[]; timestamp: number }> =
+    new Map();
+  private readonly VECTOR_CACHE_TTL_MS = 300000; // 5 minutes en ms
 
   private async performVectorSearch(
     query: string,
@@ -236,6 +239,7 @@ export class IntelligentSearchService {
     topK: number,
     useCache: boolean,
   ): Promise<{ results: any[]; metadata: any; fromCache: boolean }> {
+    const safeTable = validateTableName(tableName);
     const client = await this.pool.connect();
 
     try {
@@ -243,17 +247,17 @@ export class IntelligentSearchService {
       const cacheKey = `${tableName}:${query}:${topK}`;
       const now = Date.now();
 
-      if (useCache && this.vectorCache.has(cacheKey)) {
-        const cached = this.vectorCache.get(cacheKey)!;
-        if (now - cached.timestamp < this.VECTOR_CACHE_TTL) {
+      if (useCache && this.vectorCacheTTL.has(cacheKey)) {
+        const cached = this.vectorCacheTTL.get(cacheKey)!;
+        if (now - cached.timestamp < this.VECTOR_CACHE_TTL_MS) {
           Logger.debug(`📦 Vector Cache Hit: ${cacheKey}`);
           return {
             results: cached.results,
             metadata: { cachedAt: cached.timestamp },
-            fromCache: true
+            fromCache: true,
           };
         } else {
-          this.vectorCache.delete(cacheKey); // Cache expiré
+          this.vectorCacheTTL.delete(cacheKey); // Cache expiré
         }
       }
 
@@ -269,7 +273,7 @@ export class IntelligentSearchService {
       const results = await client.query(
         `
         SELECT *, 1 - (embedding <=> $1::vector) as similarity
-        FROM ${tableName}
+        FROM ${safeTable}
         ORDER BY embedding <=> $1::vector
         LIMIT $2
         `,
@@ -278,16 +282,16 @@ export class IntelligentSearchService {
 
       // Mettre en cache les résultats
       if (useCache) {
-        this.vectorCache.set(cacheKey, {
+        this.vectorCacheTTL.set(cacheKey, {
           results: results.rows,
-          timestamp: now
+          timestamp: now,
         });
 
-        // Nettoyer le cache si trop grand
-        if (this.vectorCache.size > 100) {
-          const oldestKey = [...this.vectorCache.entries()]
-            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
-          this.vectorCache.delete(oldestKey);
+        if (this.vectorCacheTTL.size > 100) {
+          const oldestKey = [...this.vectorCacheTTL.entries()].sort(
+            (a, b) => a[1].timestamp - b[1].timestamp,
+          )[0][0];
+          this.vectorCacheTTL.delete(oldestKey);
         }
       }
 
@@ -308,7 +312,7 @@ export class IntelligentSearchService {
    * Nettoie le cache vecteur
    */
   clearVectorCache(): void {
-    this.vectorCache.clear();
+    this.vectorCacheTTL.clear();
     Logger.info("🧹 Cache vecteur vidé");
   }
 
@@ -341,9 +345,7 @@ export class IntelligentSearchService {
 
     if (query.startsWith("test:") || query.startsWith("debug:")) {
       reasoning.push("Requête de test détectée");
-      suggestions.push(
-        "Utilisez pgvector_search avec useRandomVector: true pour les tests",
-      );
+      suggestions.push("Utilisez le mode text pour les tests de performance");
     }
 
     if (length > 100) {
