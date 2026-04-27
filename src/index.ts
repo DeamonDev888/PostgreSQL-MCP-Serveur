@@ -5,6 +5,8 @@ import { FastMCP } from "fastmcp";
 import config, { dbConfig } from "./config.js";
 import Logger from "./utils/logger.js";
 import { CoreTools } from "./tools/coreTools.js";
+import { IntelligentSearchTools } from "./tools/intelligentSearch.js";
+import { PGVectorTools } from "./tools/pgvector.js";
 
 // Force all console.log to console.error to avoid breaking MCP protocol (stdio)
 console.log = (...args) => {
@@ -69,10 +71,20 @@ function updateGlobalState(connected: boolean, error?: string) {
   globalState.isConnected = connected;
   globalState.lastError = error || null;
   if (connected && pool) {
+    let displayHost = "localhost";
+    try {
+      const cs = config.database.connectionString;
+      if (cs) {
+        const url = new URL(cs);
+        displayHost = url.hostname;
+      } else {
+        displayHost = dbConfig.POSTGRES_HOST;
+      }
+    } catch {
+      displayHost = "localhost";
+    }
     globalState.connectionInfo = {
-      host:
-        config.database.connectionString?.split("@")[1]?.split("/")[0] ||
-        "localhost",
+      host: displayHost,
       database: dbConfig.POSTGRES_DATABASE,
       activeConnections: globalState.connectionCount,
       maxConnections: config.database.max,
@@ -115,6 +127,12 @@ async function runServer() {
     const coreTools = new CoreTools(getPool(), server);
     coreTools.registerTools();
 
+    const searchTools = new IntelligentSearchTools(getPool(), server);
+    searchTools.registerTools();
+
+    const vectorTools = new PGVectorTools(getPool(), server);
+    vectorTools.registerTools();
+
     // 3. Start the MCP server IMMEDIATELY to answer the "initialize" request
     // FastMCP.start() handles the stdio/sse transport connection
     await server.start();
@@ -136,7 +154,7 @@ async function runServer() {
         // 5. Audit Loop: Log pool connection saturation every 5 minutes (INC-A1)
         const auditInterval = setInterval(
           () => {
-            if (globalState.connectionCount > 10) {
+            if (globalState.connectionCount > config.database.max * 0.8) {
               Logger.warn(
                 `⚠️ [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount} (Max allowed: ${config.database.max})`,
               );
@@ -152,6 +170,9 @@ async function runServer() {
       } catch (error: any) {
         Logger.error("❌ Échec de connexion DB initiale:", error.message);
         updateGlobalState(false, error.message);
+        process.stderr.write(
+          `⚠️ [postgresql-mcp-server] DB connection failed: ${error.message}. Server is running but tools will fail until DB is available.\n`,
+        );
       }
     }, 100);
   } catch (error: any) {
@@ -174,8 +195,7 @@ const entryPath = process.argv[1]?.replace(/\\/g, "/").toLowerCase();
 
 const isMain =
   entryPath &&
-  (currentFilePath.includes(entryPath) ||
-    entryPath.includes(currentFilePath) ||
+  (entryPath === currentFilePath ||
     entryPath.endsWith("dist/index.js") ||
     entryPath.endsWith("src/index.ts"));
 

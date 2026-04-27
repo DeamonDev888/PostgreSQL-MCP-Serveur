@@ -3,16 +3,37 @@
 import { Pool } from "pg";
 import Logger from "../utils/logger.js";
 import { embeddingService } from "./embeddingService.js";
+import {
+  validateTableName,
+  validateColumnName,
+} from "../utils/sqlValidator.js";
 
-/**
- * Service de recherche hybride (Full-text + Vecteur)
- * Combine la rapidité du full-text avec la précision du vecteur
- */
+type IdTypeCache = Map<string, boolean>;
+
 export class HybridSearchService {
   private pool: Pool;
+  private idTypeCache: IdTypeCache = new Map();
 
   constructor(pool: Pool) {
     this.pool = pool;
+  }
+
+  private async isUUIDTable(tableName: string): Promise<boolean> {
+    if (this.idTypeCache.has(tableName)) {
+      return this.idTypeCache.get(tableName)!;
+    }
+    try {
+      const result = await this.pool.query(
+        `SELECT data_type FROM information_schema.columns WHERE table_name = $1 AND column_name = 'id' LIMIT 1`,
+        [tableName],
+      );
+      const isUUID =
+        result.rows.length > 0 && result.rows[0].data_type === "uuid";
+      this.idTypeCache.set(tableName, isUUID);
+      return isUUID;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -122,6 +143,9 @@ export class HybridSearchService {
     useCache: boolean,
   ): Promise<{ results: any[]; metadata: any }> {
     // const startTime = Date.now();
+    const safeTable = validateTableName(tableName);
+    const safeVectorCol = validateColumnName(vectorColumn);
+    const safeContentCol = validateColumnName(contentColumn);
     const client = await this.pool.connect();
 
     try {
@@ -131,11 +155,11 @@ export class HybridSearchService {
 
       const textResults = await client.query(
         `
-        SELECT id, ${contentColumn} as content,
-               ts_rank(to_tsvector('french', ${contentColumn}),
+        SELECT id, ${safeContentCol} as content,
+               ts_rank(to_tsvector('french', ${safeContentCol}),
                        plainto_tsquery('french', $1)) as text_rank
-        FROM ${tableName}
-        WHERE to_tsvector('french', ${contentColumn}) @@ plainto_tsquery('french', $1)
+        FROM ${safeTable}
+        WHERE to_tsvector('french', ${safeContentCol}) @@ plainto_tsquery('french', $1)
         ORDER BY text_rank DESC
         LIMIT $2
         `,
@@ -175,9 +199,7 @@ export class HybridSearchService {
       const ids = textResults.rows.map((row: any) => row.id);
 
       // Adaptation dynamique pour UUID ou Integer
-      // Si enhanced_news (UUID), on cast le VALUES en UUID
-      // Si autre table (Integer), on cast en Integer ou laisse par défaut
-      const isUUID = tableName === "enhanced_news";
+      const isUUID = await this.isUUIDTable(tableName);
       const idType = isUUID ? "::uuid" : "";
 
       // Construction de la clause VALUES pour le JOIN
@@ -191,13 +213,13 @@ export class HybridSearchService {
       const vectorQuery = `
         SELECT
           d.*,
-          1 - (d.${vectorColumn} <=> $1::vector) as similarity,
+          1 - (d.${safeVectorCol} <=> $1::vector) as similarity,
           t.rank as text_rank_index
-        FROM ${tableName} d
+        FROM ${safeTable} d
         JOIN (
           VALUES ${valuesClause}
         ) AS t(id, rank) ON d.id = t.id
-        ORDER BY d.${vectorColumn} <=> $1::vector
+        ORDER BY d.${safeVectorCol} <=> $1::vector
         LIMIT $${ids.length + 2}
       `;
 
@@ -255,6 +277,8 @@ export class HybridSearchService {
     useCache: boolean,
   ): Promise<{ results: any[]; metadata: any }> {
     // const startTime = Date.now();
+    const safeTable = validateTableName(tableName);
+    const safeVectorCol = validateColumnName(vectorColumn);
     const client = await this.pool.connect();
 
     try {
@@ -269,9 +293,9 @@ export class HybridSearchService {
       const vectorStartTime = Date.now();
       const results = await client.query(
         `
-        SELECT *, 1 - (${vectorColumn} <=> $1::vector) as similarity
-        FROM ${tableName}
-        ORDER BY ${vectorColumn} <=> $1::vector
+        SELECT *, 1 - (${safeVectorCol} <=> $1::vector) as similarity
+        FROM ${safeTable}
+        ORDER BY ${safeVectorCol} <=> $1::vector
         LIMIT $2
         `,
         [`[${queryVector.join(",")}]`, topK],
@@ -301,16 +325,18 @@ export class HybridSearchService {
     topK: number = 10,
   ): Promise<{ results: any[]; metadata: any }> {
     const startTime = Date.now();
+    const safeTable = validateTableName(tableName);
+    const safeContentCol = validateColumnName(contentColumn);
     const client = await this.pool.connect();
 
     try {
       const results = await client.query(
         `
         SELECT *,
-               ts_rank(to_tsvector('french', ${contentColumn}),
+               ts_rank(to_tsvector('french', ${safeContentCol}),
                        plainto_tsquery('french', $1)) as rank
-        FROM ${tableName}
-        WHERE to_tsvector('french', ${contentColumn}) @@ plainto_tsquery('french', $1)
+        FROM ${safeTable}
+        WHERE to_tsvector('french', ${safeContentCol}) @@ plainto_tsquery('french', $1)
         ORDER BY rank DESC
         LIMIT $2
         `,
@@ -338,14 +364,16 @@ export class HybridSearchService {
     contentColumn: string = "content",
     limit: number = 5,
   ): Promise<string[]> {
+    const safeTable = validateTableName(tableName);
+    const safeContentCol = validateColumnName(contentColumn);
     const client = await this.pool.connect();
 
     try {
       const results = await client.query(
         `
-        SELECT DISTINCT ${contentColumn}
-        FROM ${tableName}
-        WHERE ${contentColumn} ILIKE $1
+        SELECT DISTINCT ${safeContentCol}
+        FROM ${safeTable}
+        WHERE ${safeContentCol} ILIKE $1
         LIMIT $2
         `,
         [`%${partialQuery}%`, limit],

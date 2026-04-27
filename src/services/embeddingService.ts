@@ -1,15 +1,5 @@
 import axios from "axios";
 import Logger from "../utils/logger.js";
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-
-// Gestion __dirname pour ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Charger .env explicitement pour être sûr
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 /**
  * Service de génération d'embeddings pour production
@@ -23,20 +13,34 @@ export class EmbeddingService {
   private cache: Map<string, number[]> = new Map();
   private maxCacheSize = 1000;
 
-  constructor(config?: { apiKey?: string; baseURL?: string; model?: string }) {
-    // Debug Paths and Env
-    Logger.debug(`📂 CWD: ${process.cwd()}`);
-    Logger.debug(`📂 Service Dir: ${__dirname}`);
+  private static MODEL_DIMENSIONS: Record<string, number> = {
+    "qwen/qwen3-embedding-8b": 4096,
+    "text-embedding-3-small": 1536,
+    "text-embedding-ada-002": 1536,
+    "text-embedding-3-large": 3072,
+  };
 
+  getDimensionsForModel(model?: string): number {
+    const m = model || this.modelName;
+    for (const [key, dims] of Object.entries(
+      EmbeddingService.MODEL_DIMENSIONS,
+    )) {
+      if (m.includes(key) || key.includes(m)) return dims;
+    }
+    return 1536;
+  }
+
+  constructor(config?: { apiKey?: string; baseURL?: string; model?: string }) {
     // Priority:
     // 1. Programmatic config
-    // 2. Workflow variables (consistency)
-    // 3. PostgreSQL server variables
+    // 2. OVERMIND_EMBEDDING_KEY (Workflow variable)
+    // 3. OPENROUTER_API_KEY (official spelling)
+    // 4. OPEN_ROUTER_API_KEY (legacy)
     const openRouterKey =
       config?.apiKey ||
       process.env.OVERMIND_EMBEDDING_KEY ||
-      process.env.OPEN_ROUTER_API_KEY ||
-      process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY ||
+      process.env.OPEN_ROUTER_API_KEY;
 
     const customURL = config?.baseURL || process.env.OVERMIND_EMBEDDING_URL;
     const customModel = config?.model || process.env.OVERMIND_EMBEDDING_MODEL;
@@ -78,7 +82,7 @@ export class EmbeddingService {
     const {
       model = this.modelName,
       useCache = true,
-      dimensions = 4096,
+      dimensions = this.getDimensionsForModel(),
     } = options;
 
     // 0. Nettoyer
@@ -102,7 +106,7 @@ export class EmbeddingService {
         return embedding;
       } else {
         throw new Error(
-          "❌ CRITICAL: No API Configuration found. Mock mode is disabled. Please set OPEN_ROUTER_API_KEY in .env",
+          "❌ CRITICAL: No API Configuration found. Mock mode is disabled. Please set OPENROUTER_API_KEY, OPEN_ROUTER_API_KEY, or OVERMIND_EMBEDDING_KEY in .env",
         );
       }
     } catch (error: any) {
@@ -117,52 +121,73 @@ export class EmbeddingService {
   private async generateWithAPI(
     text: string,
     model: string,
+    retries: number = 3,
   ): Promise<number[]> {
-    try {
-      const response = await axios.post(
-        `${this.baseURL}/embeddings`,
-        {
-          model: model,
-          input: text,
-          encoding_format: "float",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-            // OpenRouter specific headers
-            "HTTP-Referer": "https://sentinel-bot.local",
-            "X-Title": "Sentinel Market AI",
+    const baseDelay = 1000;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await axios.post(
+          `${this.baseURL}/embeddings`,
+          {
+            model: model,
+            input: text,
+            encoding_format: "float",
           },
-          timeout: 10000, // Timeout optimisé pour Qwen (10s)
-        },
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://sentinel-bot.local",
+              "X-Title": "Sentinel Market AI",
+            },
+            timeout: 30000,
+          },
+        );
 
-      if (
-        response.data &&
-        response.data.data &&
-        response.data.data.length > 0
-      ) {
-        const vec = response.data.data[0].embedding;
-        Logger.debug(`✅ API Embedding: ${vec.length} dims (Model: ${model})`);
-        return vec;
-      } else {
-        throw new Error("Invalid API Response format: No embedding data found");
+        if (
+          response.data &&
+          response.data.data &&
+          response.data.data.length > 0
+        ) {
+          const vec = response.data.data[0].embedding;
+          Logger.debug(
+            `✅ API Embedding: ${vec.length} dims (Model: ${model})`,
+          );
+          return vec;
+        } else {
+          throw new Error(
+            "Invalid API Response format: No embedding data found",
+          );
+        }
+      } catch (err: any) {
+        const msg = err.response?.data?.error?.message || err.message;
+        if (
+          attempt < retries &&
+          (err.code === "ECONNABORTED" || err.response?.status >= 500)
+        ) {
+          const delay = baseDelay * attempt;
+          Logger.warn(
+            `⏳ Embedding API retry ${attempt}/${retries} after ${delay}ms: ${msg}`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        Logger.error(
+          `API Error details: ${JSON.stringify(err.response?.data || {})}`,
+        );
+        throw new Error(`API Error: ${msg}`);
       }
-    } catch (err: any) {
-      const msg = err.response?.data?.error?.message || err.message;
-      Logger.error(
-        `API Error details: ${JSON.stringify(err.response?.data || {})}`,
-      );
-      throw new Error(`API Error: ${msg}`);
     }
+    throw new Error("API Error: max retries exceeded");
   }
 
   // Disabled Mock Embedding
   // private generateMockEmbedding(dimensions: number): number[] { ... }
 
   private addToCache(key: string, embedding: number[]): void {
-    if (this.cache.size >= this.maxCacheSize) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
       if (firstKey !== undefined) this.cache.delete(firstKey);
     }
@@ -184,7 +209,20 @@ export class EmbeddingService {
   }
 }
 
-export const embeddingService = new EmbeddingService();
+let _embeddingService: EmbeddingService | null = null;
+
+export function getEmbeddingService(): EmbeddingService {
+  if (!_embeddingService) {
+    _embeddingService = new EmbeddingService();
+  }
+  return _embeddingService;
+}
+
+export const embeddingService = new Proxy({} as EmbeddingService, {
+  get(_, prop) {
+    return (getEmbeddingService() as any)[prop];
+  },
+});
 
 /**
  * Drop-in helper for OverMind Memory refactoring.
