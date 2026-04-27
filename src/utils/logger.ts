@@ -4,6 +4,8 @@ import path from "path";
 class Logger {
   private logDir: string;
   private logFile: string;
+  private stream: fs.WriteStream | null = null;
+  private isDev: boolean;
 
   constructor() {
     this.logDir = path.join(process.cwd(), "logs");
@@ -11,11 +13,13 @@ class Logger {
       this.logDir,
       `postgresql-mcp-${new Date().toISOString().split("T")[0]}.log`,
     );
+    this.isDev = process.env.NODE_ENV !== "production";
 
-    // Créer le dossier de logs s'il n'existe pas
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });
     }
+
+    this.stream = fs.createWriteStream(this.logFile, { flags: "a" });
   }
 
   private formatMessage(level: string, ...args: any[]): string {
@@ -32,11 +36,13 @@ class Logger {
   private writeLog(level: string, ...args: any[]): void {
     const message = this.formatMessage(level, ...args);
 
-    // Écrire dans le fichier de log
-    fs.appendFileSync(this.logFile, message + "\n");
+    if (this.stream) {
+      this.stream.write(message + "\n");
+    }
 
-    // Afficher dans stderr pour ne pas interférer avec MCP
-    // console.error(message);
+    if (this.isDev) {
+      process.stderr.write(message + "\n");
+    }
   }
 
   info(...args: any[]): void {
@@ -49,11 +55,19 @@ class Logger {
 
   error(...args: any[]): void {
     this.writeLog("ERROR", ...args);
+    process.stderr.write(this.formatMessage("ERROR", ...args) + "\n");
   }
 
   debug(...args: any[]): void {
-    if (process.env.NODE_ENV === "development") {
+    if (this.isDev) {
       this.writeLog("DEBUG", ...args);
+    }
+  }
+
+  close(): void {
+    if (this.stream) {
+      this.stream.end();
+      this.stream = null;
     }
   }
 }

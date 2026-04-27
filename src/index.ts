@@ -5,21 +5,25 @@ import { FastMCP } from "fastmcp";
 import config, { dbConfig } from "./config.js";
 import Logger from "./utils/logger.js";
 import { CoreTools } from "./tools/coreTools.js";
+import { IntelligentSearchTools } from "./tools/intelligentSearch.js";
+import { PGVectorTools } from "./tools/pgvector.js";
 
-// 🛡️ SHIELD: Protect stdout from pollution (prevents EOF/handshake errors)
-const originalStdoutWrite = process.stdout.write.bind(process.stdout);
-process.stdout.write = (
-  chunk: any,
-  encoding?: any,
-  callback?: any,
-): boolean => {
-  const str = typeof chunk === "string" ? chunk : chunk.toString();
-  // Only allow JSON-RPC strings (starting with {) to go through stdout
-  if (!str.trim().startsWith("{")) {
-    return process.stderr.write(chunk, encoding, callback);
-  }
-  return originalStdoutWrite(chunk, encoding, callback);
+// Force all console.log to console.error to avoid breaking MCP protocol (stdio)
+console.log = (...args) => {
+  console.error(...args);
 };
+
+// 🚑 Emergency Recovery: Handle unhandled errors to log them before exiting
+process.on("uncaughtException", (error) => {
+  Logger.error("🔥 UNCAUGHT EXCEPTION:", error);
+  process.stderr.write(`Fatal Error: ${error.message}\n`);
+  setTimeout(() => process.exit(1), 100);
+});
+
+process.on("unhandledRejection", (reason) => {
+  Logger.error("🌊 UNHANDLED REJECTION:", reason);
+  process.stderr.write(`Unhandled Rejection: ${reason}\n`);
+});
 
 /**
  * Singleton MCP Server instance
@@ -33,7 +37,7 @@ let pool: Pool | null = null;
 
 const globalState = {
   isConnected: false,
-  connectionInfo: null as any,
+  connectionInfo: null as Record<string, unknown> | null,
   lastError: null as string | null,
   connectionCount: 0,
 };
@@ -67,10 +71,20 @@ function updateGlobalState(connected: boolean, error?: string) {
   globalState.isConnected = connected;
   globalState.lastError = error || null;
   if (connected && pool) {
+    let displayHost = "localhost";
+    try {
+      const cs = config.database.connectionString;
+      if (cs) {
+        const url = new URL(cs);
+        displayHost = url.hostname;
+      } else {
+        displayHost = dbConfig.POSTGRES_HOST;
+      }
+    } catch {
+      displayHost = "localhost";
+    }
     globalState.connectionInfo = {
-      host:
-        config.database.connectionString?.split("@")[1]?.split("/")[0] ||
-        "localhost",
+      host: displayHost,
       database: dbConfig.POSTGRES_DATABASE,
       activeConnections: globalState.connectionCount,
       maxConnections: config.database.max,
@@ -113,6 +127,12 @@ async function runServer() {
     const coreTools = new CoreTools(getPool(), server);
     coreTools.registerTools();
 
+    const searchTools = new IntelligentSearchTools(getPool(), server);
+    searchTools.registerTools();
+
+    const vectorTools = new PGVectorTools(getPool(), server);
+    vectorTools.registerTools();
+
     // 3. Start the MCP server IMMEDIATELY to answer the "initialize" request
     // FastMCP.start() handles the stdio/sse transport connection
     await server.start();
@@ -130,9 +150,29 @@ async function runServer() {
         Logger.info(
           `✅ Connexion PostgreSQL validée: ${dbConfig.POSTGRES_DATABASE}`,
         );
+
+        // 5. Audit Loop: Log pool connection saturation every 5 minutes (INC-A1)
+        const auditInterval = setInterval(
+          () => {
+            if (globalState.connectionCount > config.database.max * 0.8) {
+              Logger.warn(
+                `⚠️ [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount} (Max allowed: ${config.database.max})`,
+              );
+            } else {
+              Logger.debug(
+                `📊 [AUDIT] Pool PostgreSQL - Active Connections: ${globalState.connectionCount}`,
+              );
+            }
+          },
+          5 * 60 * 1000,
+        );
+        auditInterval.unref();
       } catch (error: any) {
         Logger.error("❌ Échec de connexion DB initiale:", error.message);
         updateGlobalState(false, error.message);
+        process.stderr.write(
+          `⚠️ [postgresql-mcp-server] DB connection failed: ${error.message}. Server is running but tools will fail until DB is available.\n`,
+        );
       }
     }, 100);
   } catch (error: any) {
@@ -155,8 +195,7 @@ const entryPath = process.argv[1]?.replace(/\\/g, "/").toLowerCase();
 
 const isMain =
   entryPath &&
-  (currentFilePath.includes(entryPath) ||
-    entryPath.includes(currentFilePath) ||
+  (entryPath === currentFilePath ||
     entryPath.endsWith("dist/index.js") ||
     entryPath.endsWith("src/index.ts"));
 

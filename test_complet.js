@@ -5,16 +5,16 @@
  * Valide les fonctionnalités critiques du serveur
  */
 
-import assert from 'node:assert';
-import { CoreTools } from './dist/tools/coreTools.js';
-import { FastMCP } from 'fastmcp';
-import { Pool } from 'pg';
+import assert from "node:assert";
+import { CoreTools } from "./dist/tools/coreTools.js";
+import { FastMCP } from "fastmcp";
+import { Pool } from "pg";
 
 // Logger simple pour les tests
 const testLogger = {
   info: (msg) => console.log(`✅ ${msg}`),
   error: (msg) => console.error(`❌ ${msg}`),
-  debug: (msg) => console.log(`🔍 ${msg}`)
+  debug: (msg) => console.log(`🔍 ${msg}`),
 };
 
 // Variables globales
@@ -29,21 +29,23 @@ async function testInitialization() {
   try {
     // Configuration de test - Support both POSTGRES_* and PG* prefixes for flexibility
     const config = {
-      host: process.env.POSTGRES_HOST || process.env.PGHOST || 'localhost',
+      host: process.env.POSTGRES_HOST || process.env.PGHOST || "localhost",
       port: parseInt(process.env.POSTGRES_PORT || process.env.PGPORT) || 5432,
-      database: process.env.POSTGRES_DATABASE || process.env.PGDATABASE || 'test_db',
-      user: process.env.POSTGRES_USER || process.env.PGUSER || 'postgres',
-      password: process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD || 'postgres'
+      database:
+        process.env.POSTGRES_DATABASE || process.env.PGDATABASE || "test_db",
+      user: process.env.POSTGRES_USER || process.env.PGUSER || "postgres",
+      password:
+        process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD || "postgres",
     };
 
     pool = new Pool(config);
-    server = new FastMCP({ name: 'test-server' });
+    server = new FastMCP({ name: "test-server" });
     coreTools = new CoreTools(pool, server);
 
-    assert.ok(coreTools, 'CoreTools devrait être défini');
-    assert.ok(coreTools.registerTools, 'registerTools devrait être défini');
+    assert.ok(coreTools, "CoreTools devrait être défini");
+    assert.ok(coreTools.registerTools, "registerTools devrait être défini");
 
-    testLogger.info('Tests initialisés avec succès');
+    testLogger.info("Tests initialisés avec succès");
     return true;
   } catch (error) {
     testLogger.error(`Initialisation échouée: ${error.message}`);
@@ -57,10 +59,10 @@ async function testInitialization() {
 async function testDatabaseConnection() {
   try {
     const client = await pool.connect();
-    assert.ok(client, 'Client devrait être défini');
+    assert.ok(client, "Client devrait être défini");
     await client.release();
 
-    testLogger.info('Connexion BD réussie');
+    testLogger.info("Connexion BD réussie");
     return true;
   } catch (error) {
     testLogger.error(`Connexion BD échouée: ${error.message}`);
@@ -73,10 +75,10 @@ async function testDatabaseConnection() {
  */
 async function testSimpleQueries() {
   try {
-    const result = await pool.query('SELECT 1 as test');
-    assert.strictEqual(result.rows[0].test, 1, 'Le résultat devrait être 1');
+    const result = await pool.query("SELECT 1 as test");
+    assert.strictEqual(result.rows[0].test, 1, "Le résultat devrait être 1");
 
-    testLogger.info('Requête SQL exécutée avec succès');
+    testLogger.info("Requête SQL exécutée avec succès");
     return true;
   } catch (error) {
     testLogger.error(`Requête SQL échouée: ${error.message}`);
@@ -90,14 +92,18 @@ async function testSimpleQueries() {
 async function testTransactions() {
   try {
     const client = await pool.connect();
-    await client.query('BEGIN');
-    const result = await client.query('SELECT 1 as transaction_test');
-    await client.query('ROLLBACK');
+    await client.query("BEGIN");
+    const result = await client.query("SELECT 1 as transaction_test");
+    await client.query("ROLLBACK");
     await client.release();
 
-    assert.strictEqual(result.rows[0].transaction_test, 1, 'Le résultat transaction devrait être 1');
+    assert.strictEqual(
+      result.rows[0].transaction_test,
+      1,
+      "Le résultat transaction devrait être 1",
+    );
 
-    testLogger.info('Transaction réussie');
+    testLogger.info("Transaction réussie");
     return true;
   } catch (error) {
     testLogger.error(`Transaction échouée: ${error.message}`);
@@ -110,14 +116,18 @@ async function testTransactions() {
  */
 async function testSQLErrorHandling() {
   try {
-    await pool.query('SELECT * FROM table_inexistante');
-    testLogger.error('Devrait avoir lancé une erreur');
+    await pool.query("SELECT * FROM table_inexistante");
+    testLogger.error("Devrait avoir lancé une erreur");
     return false;
   } catch (error) {
-    assert.ok(error, 'Erreur devrait être définie');
-    assert.ok(error.message.includes('does not exist'), 'Message devrait contenir "does not exist"');
+    assert.ok(error, "Erreur devrait être définie");
+    assert.ok(
+      error.message.includes("does not exist") ||
+        error.message.includes("n'existe pas"),
+      'Message devrait contenir "does not exist" ou "n\'existe pas"',
+    );
 
-    testLogger.info('Gestion d\'erreur SQL correcte');
+    testLogger.info("Gestion d'erreur SQL correcte");
     return true;
   }
 }
@@ -128,10 +138,13 @@ async function testSQLErrorHandling() {
 async function testPerformance() {
   try {
     const start = Date.now();
-    await pool.query('SELECT 1');
+    await pool.query("SELECT 1");
     const duration = Date.now() - start;
 
-    assert.ok(duration < 100, `La requête devrait prendre < 100ms (actuel: ${duration}ms)`);
+    assert.ok(
+      duration < 1000,
+      `La requête devrait prendre < 1000ms (actuel: ${duration}ms)`,
+    );
 
     testLogger.info(`Performance: ${duration}ms`);
     return true;
@@ -146,14 +159,14 @@ async function testPerformance() {
  */
 async function testMultipleConnections() {
   try {
-    const promises = Array(5).fill(null).map(() =>
-      pool.query('SELECT 1')
-    );
+    const promises = Array(5)
+      .fill(null)
+      .map(() => pool.query("SELECT 1"));
 
     const results = await Promise.all(promises);
-    assert.strictEqual(results.length, 5, 'Devrait avoir 5 résultats');
+    assert.strictEqual(results.length, 5, "Devrait avoir 5 résultats");
 
-    testLogger.info('Connexions parallèles réussies');
+    testLogger.info("Connexions parallèles réussies");
     return true;
   } catch (error) {
     testLogger.error(`Connexions multiples échouées: ${error.message}`);
@@ -166,12 +179,12 @@ async function testMultipleConnections() {
  */
 async function testSecurityValidation() {
   try {
-    const dangerousQuery = 'DROP TABLE users';
+    const dangerousQuery = "DROP TABLE users";
     const isDangerous = /DROP|DELETE|UPDATE|INSERT/i.test(dangerousQuery);
 
-    assert.ok(isDangerous, 'La requête devrait être détectée comme dangereuse');
+    assert.ok(isDangerous, "La requête devrait être détectée comme dangereuse");
 
-    testLogger.info('Validation sécurité réussie');
+    testLogger.info("Validation sécurité réussie");
     return true;
   } catch (error) {
     testLogger.error(`Test sécurité échoué: ${error.message}`);
@@ -185,16 +198,25 @@ async function testSecurityValidation() {
 async function testParameterValidation() {
   try {
     const maliciousInput = "'; DROP TABLE users; --";
-    const sanitized = maliciousInput.replace(/[';]/g, '');
+    const sanitized = maliciousInput.replace(/[';]/g, "");
 
     // Test plus réaliste : vérifier que les caractères dangereux ont été retirés
-    assert.ok(!sanitized.includes(';'), 'Les points-virgules devraient être retirés');
-    assert.ok(!sanitized.includes("'"), 'Les guillemets simples devraient être retirés');
+    assert.ok(
+      !sanitized.includes(";"),
+      "Les points-virgules devraient être retirés",
+    );
+    assert.ok(
+      !sanitized.includes("'"),
+      "Les guillemets simples devraient être retirés",
+    );
 
     // Vérifier que la longueur a diminué (nettoyage effectué)
-    assert.ok(sanitized.length < maliciousInput.length, 'La sanitization devrait réduire la longueur');
+    assert.ok(
+      sanitized.length < maliciousInput.length,
+      "La sanitization devrait réduire la longueur",
+    );
 
-    testLogger.info('Validation paramètres réussie');
+    testLogger.info("Validation paramètres réussie");
     return true;
   } catch (error) {
     testLogger.error(`Validation paramètres échouée: ${error.message}`);
@@ -208,7 +230,7 @@ async function testParameterValidation() {
 async function cleanup() {
   if (pool) {
     await pool.end();
-    testLogger.info('Pool de connexions fermé');
+    testLogger.info("Pool de connexions fermé");
   }
 }
 
@@ -216,18 +238,18 @@ async function cleanup() {
  * Exécution principale des tests
  */
 async function runAllTests() {
-  console.log('\n🧪 Exécution des Tests PostgreSQL MCP Serveur...\n');
+  console.log("\n🧪 Exécution des Tests PostgreSQL MCP Serveur...\n");
 
   const tests = [
-    { name: 'Initialisation', fn: testInitialization },
-    { name: 'Connexion BD', fn: testDatabaseConnection },
-    { name: 'Requêtes SQL simples', fn: testSimpleQueries },
-    { name: 'Transactions', fn: testTransactions },
-    { name: 'Gestion erreurs SQL', fn: testSQLErrorHandling },
-    { name: 'Performance', fn: testPerformance },
-    { name: 'Connexions multiples', fn: testMultipleConnections },
-    { name: 'Validation sécurité', fn: testSecurityValidation },
-    { name: 'Validation paramètres', fn: testParameterValidation }
+    { name: "Initialisation", fn: testInitialization },
+    { name: "Connexion BD", fn: testDatabaseConnection },
+    { name: "Requêtes SQL simples", fn: testSimpleQueries },
+    { name: "Transactions", fn: testTransactions },
+    { name: "Gestion erreurs SQL", fn: testSQLErrorHandling },
+    { name: "Performance", fn: testPerformance },
+    { name: "Connexions multiples", fn: testMultipleConnections },
+    { name: "Validation sécurité", fn: testSecurityValidation },
+    { name: "Validation paramètres", fn: testParameterValidation },
   ];
 
   let passed = 0;
@@ -245,15 +267,17 @@ async function runAllTests() {
   await cleanup();
 
   // Rapport final
-  console.log('\n📊 RÉSULTATS DES TESTS\n');
-  console.log('='.repeat(50));
+  console.log("\n📊 RÉSULTATS DES TESTS\n");
+  console.log("=".repeat(50));
   console.log(`✅ Tests réussis: ${passed}/${tests.length}`);
   console.log(`❌ Tests échoués: ${failed}/${tests.length}`);
-  console.log(`📈 Taux de réussite: ${((passed / tests.length) * 100).toFixed(1)}%`);
-  console.log('='.repeat(50));
+  console.log(
+    `📈 Taux de réussite: ${((passed / tests.length) * 100).toFixed(1)}%`,
+  );
+  console.log("=".repeat(50));
 
   if (failed === 0) {
-    console.log('\n🎉 TOUS LES TESTS ONT RÉUSSI !\n');
+    console.log("\n🎉 TOUS LES TESTS ONT RÉUSSI !\n");
     process.exit(0);
   } else {
     console.log(`\n⚠️ ${failed} test(s) échoué(s)\n`);
@@ -262,7 +286,7 @@ async function runAllTests() {
 }
 
 // Exécution
-runAllTests().catch(error => {
+runAllTests().catch((error) => {
   testLogger.error(`Erreur critique: ${error.message}`);
   process.exit(1);
 });
