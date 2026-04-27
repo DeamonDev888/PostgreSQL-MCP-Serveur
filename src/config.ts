@@ -9,6 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Charger les variables d'environnement de manière robuste
+// Note: Les chemins vers Workflow/ sont présents pour la compatibilité
+// avec l'architecture multi-projets Overmind. Retirez-les si ce serveur
+// est utilisé de manière autonome.
 const searchPaths = [
   resolve(__dirname, "../../.env"), // dist/../.. -> root du projet
   resolve(__dirname, "../.env"), // dist/.. -> package root
@@ -50,20 +53,21 @@ const ConfigSchema = z.object({
 // Valider et parser la configuration
 const configResult = ConfigSchema.safeParse(process.env);
 
-// Silenced for library usage - avoid noise if env is loaded later
-/*
 if (!configResult.success) {
   console.error(
     "⚠️ [postgresql-mcp-server] Configuration invalide ou incomplète:",
   );
   console.error(JSON.stringify(configResult.error.format(), null, 2));
+  if (process.env.NODE_ENV !== "test") {
+    process.exit(1);
+  }
 }
-*/
 
-// Ensure data exists even on failure for library safety
-export const dbConfig = configResult.success
+type DbConfig = z.infer<typeof ConfigSchema>;
+
+export const dbConfig: DbConfig = configResult.success
   ? configResult.data
-  : ({
+  : {
       POSTGRES_HOST: "localhost",
       POSTGRES_PORT: 5432,
       POSTGRES_USER: "",
@@ -72,14 +76,19 @@ export const dbConfig = configResult.success
       POSTGRES_SSL: false,
       POSTGRES_MAX_CONNECTIONS: 10,
       POSTGRES_IDLE_TIMEOUT: 30000,
-      NODE_ENV: "development",
-    } as any);
+      NODE_ENV: "test" as const,
+      POSTGRES_CONNECTION_STRING: undefined,
+    };
 
 // Construire la configuration de connexion
-export const postgresConfig: any = dbConfig.POSTGRES_CONNECTION_STRING
+const sslConfig = dbConfig.POSTGRES_SSL
+  ? { rejectUnauthorized: dbConfig.NODE_ENV === "production" }
+  : false;
+
+export const postgresConfig = dbConfig.POSTGRES_CONNECTION_STRING
   ? {
       connectionString: dbConfig.POSTGRES_CONNECTION_STRING,
-      ssl: dbConfig.POSTGRES_SSL ? { rejectUnauthorized: false } : false,
+      ssl: sslConfig,
       max: dbConfig.POSTGRES_MAX_CONNECTIONS,
       idleTimeoutMillis: dbConfig.POSTGRES_IDLE_TIMEOUT,
       connectionTimeoutMillis: 10000,
@@ -92,7 +101,7 @@ export const postgresConfig: any = dbConfig.POSTGRES_CONNECTION_STRING
       user: dbConfig.POSTGRES_USER,
       password: dbConfig.POSTGRES_PASSWORD || "",
       database: dbConfig.POSTGRES_DATABASE,
-      ssl: dbConfig.POSTGRES_SSL ? { rejectUnauthorized: false } : false,
+      ssl: sslConfig,
       max: dbConfig.POSTGRES_MAX_CONNECTIONS,
       idleTimeoutMillis: dbConfig.POSTGRES_IDLE_TIMEOUT,
       connectionTimeoutMillis: 10000,

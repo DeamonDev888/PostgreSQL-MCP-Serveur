@@ -7,11 +7,17 @@ import Logger from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 import { embeddingService } from "../services/embeddingService.js";
 import { DBOptimizer } from "../utils/dbOptimizer.js";
+import {
+  validateTableName,
+  validateColumnName,
+  sanitizeIndexName,
+  validateDimensions,
+} from "../utils/sqlValidator.js";
 
 /**
  * Outils MCP Core - Refactorisation pour cohérence et simplicité
  *
- * 8 outils IMPLICITES et COHÉRENTS au lieu de 38 dispersés
+ * 9 outils IMPLICITES et COHÉRENTS au lieu de 38 dispersés
  */
 export class CoreTools {
   private pool: Pool;
@@ -37,7 +43,7 @@ export class CoreTools {
     this.vectorize_row();
     this.help();
 
-    Logger.info("✅ Outils Core enregistrés (8 outils cohérents)");
+    Logger.info("✅ Outils Core enregistrés (9 outils cohérents)");
   }
 
   // ============================================================================
@@ -59,9 +65,8 @@ export class CoreTools {
           .describe("Diagnostic approfondi avec suggestions"),
       }),
       execute: async (args) => {
+        const client = await this.pool.connect();
         try {
-          const client = await this.pool.connect();
-
           // 1. Diagnostic de connexion
           if (args.type === "connection" || args.type === "all") {
             const connResult = await client.query(
@@ -75,7 +80,6 @@ export class CoreTools {
             output += `📋 Version: ${connResult.rows[0].version.split(" ")[0]} ${connResult.rows[0].version.split(" ")[1]}\n\n`;
 
             if (args.type === "connection") {
-              await client.release();
               return output;
             }
           }
@@ -119,7 +123,6 @@ export class CoreTools {
               // pg_stat_statements non activé
             }
 
-            await client.release();
             return perfOutput;
           }
 
@@ -127,6 +130,8 @@ export class CoreTools {
         } catch (error: any) {
           Logger.error("❌ [diagnose]", error.message);
           return `❌ Erreur: ${error.message}`;
+        } finally {
+          client.release();
         }
       },
     });
@@ -149,9 +154,8 @@ export class CoreTools {
         includeSize: z.boolean().default(false).describe("Inclure les tailles"),
       }),
       execute: async (args) => {
+        const client = await this.pool.connect();
         try {
-          const client = await this.pool.connect();
-
           switch (args.type) {
             case "databases": {
               const result = await client.query(`
@@ -168,7 +172,6 @@ export class CoreTools {
                 )
                 .join("\n");
 
-              await client.release();
               return `📊 **Bases de données** (${result.rows.length}):\n\n${databases}`;
             }
 
@@ -191,7 +194,6 @@ export class CoreTools {
                 })
                 .join("\n");
 
-              await client.release();
               return `📋 **Tables du schéma '${schema}'** (${result.rows.length}):\n\n${tables}`;
             }
 
@@ -222,7 +224,6 @@ export class CoreTools {
                 })
                 .join("\n");
 
-              await client.release();
               return `📋 **Structure de '${tableName}'** (${result.rows.length} colonnes):\n\n${columns}`;
             }
 
@@ -234,8 +235,6 @@ export class CoreTools {
               const tablesResult = await client.query(`
                 SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'public'
               `);
-
-              await client.release();
 
               return (
                 `🗺️ **Structure de la Base**\n\n` +
@@ -251,6 +250,8 @@ export class CoreTools {
         } catch (error: any) {
           Logger.error("❌ [explore]", error.message);
           return `❌ Erreur: ${error.message}`;
+        } finally {
+          client.release();
         }
       },
     });
@@ -298,6 +299,24 @@ MCP_PG_VECTOR({ sql: "INSERT INTO logs VALUES ('test')", readonly: false })
               queryUpper,
             );
 
+          // Sécurité renforcée (SEC-2): bloquer les patterns dangereux en readonly
+          if (args.readonly) {
+            const dangerousPatterns =
+              /\b(COPY|LO_EXPORT|LO_IMPORT|PG_SLEEP|PG_READ_FILE|PG_WRITE_FILE|PG_EXECUTE_SERVER_PROGRAM|DBLINK|EXECUTE)\b/i;
+            if (dangerousPatterns.test(queryTrimmed)) {
+              return `❌ **Requête bloquée: motif dangereux détecté en lecture seule**\n\n⚠️ Les fonctions COPY, pg_sleep, lo_export, pg_read_file, etc. sont interdites en mode readonly.\n\n💡 Si vous avez besoin de ces opérations, contactez l'administrateur.`;
+            }
+
+            // Bloquer les multi-statements (points-virgules internes)
+            const innerSemicolons = queryTrimmed.substring(
+              0,
+              queryTrimmed.length - 1,
+            );
+            if (innerSemicolons.includes(";")) {
+              return `❌ **Requête bloquée: multi-statements détecté**\n\n⚠️ Les requêtes contenant plusieurs instructions séparées par des points-virgules sont interdites en mode readonly.\n\n💡 Exécutez chaque instruction séparément.`;
+            }
+          }
+
           // Validation automatique en mode readonly
           if (args.readonly && isMutationQuery) {
             return `❌ **Requête bloquée en mode lecture seule**
@@ -340,8 +359,13 @@ MCP_PG_VECTOR({
           const client = await this.pool.connect();
 
           try {
+            // Nettoyer le SQL pour le wrapping: retirer ; final et commentaires de fin de ligne
+            const cleanSql = queryTrimmed
+              .replace(/;\s*$/, "")
+              .replace(/--\s*$/, "");
+
             // Limite automatique pour SELECT
-            let finalSql = queryTrimmed;
+            let finalSql = cleanSql;
             if (
               !queryUpper.includes("LIMIT") &&
               (queryUpper.startsWith("SELECT") || queryUpper.startsWith("WITH"))
@@ -352,7 +376,7 @@ MCP_PG_VECTOR({
               ) {
                 finalSql = `${finalSql} LIMIT ${args.limit}`;
               } else {
-                finalSql = `SELECT * FROM (${args.sql}) AS limited_query LIMIT ${args.limit}`;
+                finalSql = `SELECT * FROM (${cleanSql}) AS limited_query LIMIT ${args.limit}`;
               }
             }
 
@@ -459,7 +483,7 @@ MCP_PG_VECTOR({
           .enum(["auto", "text", "vector", "hybrid"])
           .default("auto")
           .describe("Mode de recherche (auto = détecte automatiquement)"),
-        topK: z.number().default(10).describe("Nombre de résultats"),
+        topK: z.number().max(1000).default(10).describe("Nombre de résultats"),
         embed: z
           .boolean()
           .default(true)
@@ -541,6 +565,7 @@ MCP_PG_VECTOR({
       }),
       execute: async (args) => {
         try {
+          const safeTable = validateTableName(args.table);
           const client = await this.pool.connect();
 
           // Construire les colonnes et valeurs
@@ -548,9 +573,9 @@ MCP_PG_VECTOR({
           const values: any[] = [];
           let paramIndex = 1;
 
-          // Ajouter les données
+          // Ajouter les données (valider chaque nom de colonne)
           for (const [key, value] of Object.entries(args.data)) {
-            columns.push(key);
+            columns.push(validateColumnName(key));
             values.push(value);
           }
 
@@ -586,7 +611,7 @@ MCP_PG_VECTOR({
 
           // Construire la requête
           const placeholders = columns.map(() => `$${paramIndex++}`).join(", ");
-          const query = `INSERT INTO ${args.table} (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`;
+          const query = `INSERT INTO ${safeTable} (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`;
 
           const result = await client.query(query, values);
           await client.release();
@@ -627,14 +652,17 @@ MCP_PG_VECTOR({
       }),
       execute: async (args) => {
         try {
+          const safeTable = validateTableName(args.table);
+          const safeColumn = validateColumnName(args.column);
+          validateDimensions(args.dimensions);
           const client = await this.pool.connect();
 
           switch (args.action) {
             case "create": {
               const query = `
-                CREATE TABLE IF NOT EXISTS ${args.table} (
+                CREATE TABLE IF NOT EXISTS ${safeTable} (
                   id SERIAL PRIMARY KEY,
-                  ${args.column} vector(${args.dimensions}),
+                  ${safeColumn} vector(${args.dimensions}),
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
               `;
@@ -644,26 +672,28 @@ MCP_PG_VECTOR({
             }
 
             case "index": {
-              const indexName = `${args.table}_${args.column}_idx`;
-              const query = `CREATE INDEX IF NOT EXISTS ${indexName} ON ${args.table} USING ivfflat (${args.column} vector_cosine_ops) WITH (lists = 100);`;
+              const indexName = sanitizeIndexName(
+                `${args.table}_${args.column}_idx`,
+              );
+              const query = `CREATE INDEX IF NOT EXISTS ${indexName} ON ${safeTable} USING ivfflat (${safeColumn} vector_cosine_ops) WITH (lists = 100);`;
               await client.query(query);
               await client.release();
-              return `✅ **Index vectoriel créé**\n\n📋 Table: ${args.table}\n🧬 Index: ${indexName}\n🎯 Type: IVFFlat (cosine)`;
+              return `✅ **Index vectoriel créé**\n\n📋 Table: ${args.table}\n🧬 Index: ${args.table}_${args.column}_idx\n🎯 Type: IVFFlat (cosine)`;
             }
 
             case "stats": {
               const result = await client.query(`
                 SELECT COUNT(*) as total_rows,
-                       AVG(array_length(${args.column}, 1)) as avg_dimensions
-                FROM ${args.table}
-                WHERE ${args.column} IS NOT NULL
+                       AVG(array_length(${safeColumn}, 1)) as avg_dimensions
+                FROM ${safeTable}
+                WHERE ${safeColumn} IS NOT NULL
               `);
               await client.release();
               return `📊 **Statistiques Vectorielles**\n\n📋 Table: ${args.table}\n📈 Lignes: ${result.rows[0].total_rows}\n🧬 Dimensions: ${result.rows[0].avg_dimensions || args.dimensions}`;
             }
 
             case "optimize": {
-              await client.query(`VACUUM ANALYZE ${args.table}`);
+              await client.query(`VACUUM ANALYZE ${safeTable}`);
               await client.release();
               return `✅ **Optimisation terminée**\n\n📋 Table: ${args.table}\n🧹 VACUUM ANALYZE exécuté`;
             }
@@ -808,13 +838,18 @@ MCP_PG_VECTOR({
       }),
       execute: async (args) => {
         try {
+          const safeTable = validateTableName(args.table);
+          const safeTargetCol = validateColumnName(args.target_column);
+          const safeTextCols = args.text_columns.map((c) =>
+            validateColumnName(c),
+          );
           const client = await this.pool.connect();
           try {
             // 1. Fetch content
-            const cols = args.text_columns
+            const cols = safeTextCols
               .map((c) => `COALESCE(${c}, '')`)
               .join(" || ' ' || ");
-            const selectQuery = `SELECT ${cols} as combined_text FROM ${args.table} WHERE id = $1`;
+            const selectQuery = `SELECT ${cols} as combined_text FROM ${safeTable} WHERE id = $1`;
 
             // Dynamic ID typing check (simple heuristic)
             const idVal = args.id;
@@ -834,7 +869,7 @@ MCP_PG_VECTOR({
             // 3. Update
             const vectorStr = `[${vector.join(",")}]`;
             await client.query(
-              `UPDATE ${args.table} SET ${args.target_column} = $1::vector WHERE id = $2`,
+              `UPDATE ${safeTable} SET ${safeTargetCol} = $1::vector WHERE id = $2`,
               [vectorStr, idVal],
             );
 
@@ -867,7 +902,7 @@ MCP_PG_VECTOR({
         if (!args.topic) {
           return (
             `❓ **Aide - Outils MCP Core**\n\n` +
-            `🤖 **8 outils simples et cohérents:**\n\n` +
+            `🤖 **9 outils simples et cohérents:**\n\n` +
             `1. 🔍 **diagnose** - Diagnostic complet (connexion, performance)\n` +
             `2. 🗺️ **explore** - Explorer bases, tables, schémas\n` +
             `3. ⚡ **query** - Exécuter des requêtes SQL\n` +
