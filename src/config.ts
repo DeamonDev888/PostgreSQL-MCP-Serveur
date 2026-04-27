@@ -50,17 +50,13 @@ const ConfigSchema = z.object({
 // Valider et parser la configuration
 const configResult = ConfigSchema.safeParse(process.env);
 
-// Silenced for library usage - avoid noise if env is loaded later
-/*
 if (!configResult.success) {
   console.error(
     "⚠️ [postgresql-mcp-server] Configuration invalide ou incomplète:",
   );
   console.error(JSON.stringify(configResult.error.format(), null, 2));
 }
-*/
 
-// Ensure data exists even on failure for library safety
 export const dbConfig = configResult.success
   ? configResult.data
   : ({
@@ -73,13 +69,18 @@ export const dbConfig = configResult.success
       POSTGRES_MAX_CONNECTIONS: 10,
       POSTGRES_IDLE_TIMEOUT: 30000,
       NODE_ENV: "development",
-    } as any);
+      POSTGRES_CONNECTION_STRING: undefined,
+    } as Record<string, unknown>);
 
 // Construire la configuration de connexion
-export const postgresConfig: any = dbConfig.POSTGRES_CONNECTION_STRING
+const sslConfig = dbConfig.POSTGRES_SSL
+  ? { rejectUnauthorized: dbConfig.NODE_ENV === "production" }
+  : false;
+
+export const postgresConfig = dbConfig.POSTGRES_CONNECTION_STRING
   ? {
       connectionString: dbConfig.POSTGRES_CONNECTION_STRING,
-      ssl: dbConfig.POSTGRES_SSL ? { rejectUnauthorized: false } : false,
+      ssl: sslConfig,
       max: dbConfig.POSTGRES_MAX_CONNECTIONS,
       idleTimeoutMillis: dbConfig.POSTGRES_IDLE_TIMEOUT,
       connectionTimeoutMillis: 10000,
@@ -92,7 +93,7 @@ export const postgresConfig: any = dbConfig.POSTGRES_CONNECTION_STRING
       user: dbConfig.POSTGRES_USER,
       password: dbConfig.POSTGRES_PASSWORD || "",
       database: dbConfig.POSTGRES_DATABASE,
-      ssl: dbConfig.POSTGRES_SSL ? { rejectUnauthorized: false } : false,
+      ssl: sslConfig,
       max: dbConfig.POSTGRES_MAX_CONNECTIONS,
       idleTimeoutMillis: dbConfig.POSTGRES_IDLE_TIMEOUT,
       connectionTimeoutMillis: 10000,

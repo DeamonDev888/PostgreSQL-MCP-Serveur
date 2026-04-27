@@ -174,6 +174,10 @@ export class EmbeddingService {
     Logger.info("🧹 Cache vidé");
   }
 
+  getModelName(): string {
+    return this.modelName;
+  }
+
   async benchmark(_texts: string[]): Promise<any> {
     // ... (Benchmark kept simple)
     return { averageTime: 0, totalTime: 0, successRate: 0 };
@@ -190,8 +194,9 @@ export async function embedText(
 ): Promise<{ embedding: number[]; model: string }> {
   try {
     const embedding = await embeddingService.generateEmbedding(text);
-    return { embedding, model: (embeddingService as any).modelName };
-  } catch {
-    return { embedding: [], model: "none" };
+    return { embedding, model: embeddingService.getModelName() };
+  } catch (error: any) {
+    Logger.error(`❌ embedText failed: ${error.message}`);
+    throw error;
   }
 }
