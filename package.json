@@ -1,6 +1,6 @@
 {
   "name": "overmind-postgres-mcp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A comprehensive MCP server for PostgreSQL database interaction",
   "main": "dist/index.js",
   "bin": "./dist/index.js",
@@ -80,12 +80,16 @@
     "dotenv": "^16.3.1",
     "fastmcp": "^3.35.0",
     "pg": "^8.11.3",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "pino-roll": "^2.2.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/node": "^20.10.0",
     "@types/pg": "^8.10.9",
+    "@types/pino": "^7.0.5",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "eslint": "^8.0.0",
