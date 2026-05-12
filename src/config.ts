@@ -18,9 +18,10 @@ function getSearchPaths(): string[] {
   const paths: string[] = [];
 
   // 0. Serveur local .env (PRIORITÉ ABSOLUE - avant CWD)
+  // __dirname = .../serveur_PostGreSQL/dist (après build)
   // Le serveur doit charger SON propre .env, pas celui du CWD
-  paths.push(resolve(__dirname, '.env'));           // serveur_PostGreSQL/.env
-  paths.push(resolve(__dirname, '../../.env'));     // Serveur MCP/.env
+  paths.push(resolve(__dirname, '../.env'));          // serveur_PostGreSQL/.env (1 level up from dist)
+  paths.push(resolve(__dirname, '../../.env'));        // Serveur MCP/.env (2 levels up from dist)
 
   // 0b. .overmind global .env (fallback global OverMind - AVANT CWD)
   //    Utilise HOME/UserProfile pour éviter chemin codé
