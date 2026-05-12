@@ -51,8 +51,7 @@ La façon la plus simple d'utiliser ce serveur est de le configurer comme un ser
 {
   "mcpServers": {
     "postgresql": {
-      "command": "npx",
-      "args": ["-y", "overmind-postgres-mcp"]
+      "command": "overmind-postgres-mcp"
     }
   }
 }
