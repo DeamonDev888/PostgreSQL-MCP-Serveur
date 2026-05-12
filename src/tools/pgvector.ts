@@ -1,7 +1,7 @@
-﻿import { FastMCP } from "fastmcp";
+import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { Pool } from "pg";
-import Logger from "../utils/logger.js";
+import { toolLogger, dbLogger } from "../utils/logger.js";
 import { embeddingService } from "../services/embeddingService.js";
 
 /**
@@ -242,7 +242,7 @@ export class PGVectorTools {
     this.analyzeSlowQueries();
     this.pgvectorHelp();
 
-    Logger.info("✅ Outils pg_vector enregistrés (17 outils)");
+    toolLogger.info("✅ Outils pg_vector enregistrés (17 outils)");
   }
 
   // ========================================================================
@@ -276,7 +276,7 @@ export class PGVectorTools {
           if (!isInstalled) {
             if (args.autoInstall) {
               await client.query("CREATE EXTENSION IF NOT EXISTS vector");
-              Logger.info("✅ Extension pg_vector installée");
+              toolLogger.info("✅ Extension pg_vector installée");
               await client.release();
               return "✅ Extension pg_vector installée avec succès";
             } else {
@@ -300,7 +300,7 @@ export class PGVectorTools {
           const version = versionResult.rows[0].version;
           return `✅ Extension pg_vector installée (version: ${version})`;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_check_extension]", error.message);
+          toolLogger.error({ err: error, tool: "pgvector_check_extension" }, "Error checking/installing extension");
 
           // Message d'erreur amélioré pour l'extension non disponible
           if (
@@ -438,8 +438,9 @@ CREATE EXTENSION vector;
             createSQL += `\n)`;
 
             await client.query(createSQL);
-            Logger.info(
-              `✅ Table ${args.tableName} créée avec colonne vectorielle`,
+            dbLogger.info(
+              { table: args.tableName, schema: args.schema },
+              "✅ Table créée avec colonne vectorielle"
             );
           } else if (tableExists) {
             // Vérifier si la colonne existe déjà
@@ -463,7 +464,7 @@ CREATE EXTENSION vector;
               ALTER TABLE ${fullTableName}
               ADD COLUMN ${args.vectorColumn} vector(${args.dimensions})
             `);
-            Logger.info(`✅ Colonne vectorielle ajoutée à ${args.tableName}`);
+            dbLogger.info({ table: args.tableName, column: args.vectorColumn }, "✅ Colonne vectorielle ajoutée");
           } else {
             await client.release();
             return `❌ La table ${args.schema}.${args.tableName} n'existe pas. Utilisez createTable:true pour la créer.`;
@@ -479,7 +480,7 @@ CREATE EXTENSION vector;
             `💡 Vous pouvez maintenant insérer des vecteurs avec pgvector_insert_vector`
           );
         } catch (error: any) {
-          Logger.error("❌ [pgvector_create_column]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_create_column", table: args.tableName }, "Error creating vector column");
           return this.formatError(error, "Erreur");
         }
       },
@@ -561,7 +562,7 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
           await client.query(query, values);
           await client.release();
 
-          Logger.info(`✅ Vecteur inséré dans ${args.tableName}`);
+          dbLogger.info({ table: args.tableName }, "✅ Vecteur inséré");
           return (
             `✅ Vecteur inséré dans ${args.schema}.${args.tableName}\n` +
             `   Dimensions: ${args.vector.length}` +
@@ -573,7 +574,7 @@ automatiquement un vrai embedding basé sur le contenu textuel.`,
               : "")
           );
         } catch (error: any) {
-          Logger.error("❌ [pgvector_insert_vector]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_insert_vector", table: args.tableName }, "Error inserting vector");
           return this.formatError(error, "Erreur");
         }
       },
@@ -653,8 +654,9 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           const embeddingText = textParts.join(" | ") || "No content provided";
 
           // Générer l'embedding via EmbeddingService
-          Logger.info(
-            `🔄 Génération embedding pour: "${embeddingText.substring(0, 50)}..."`,
+          dbLogger.info(
+            { text: embeddingText.substring(0, 50) + "..." },
+            "🔄 Génération embedding"
           );
           const embedding = await embeddingService.generateEmbedding(
             embeddingText,
@@ -662,7 +664,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
               dimensions: args.dimensions,
             },
           );
-          Logger.info(`✅ Embedding généré: ${embedding.length} dimensions`);
+          dbLogger.info({ dimensions: embedding.length }, "✅ Embedding généré");
 
           // Construire dynamiquement les colonnes et valeurs
           const columns: string[] = [args.vectorColumn];
@@ -722,7 +724,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           const insertedId = result.rows[0]?.id;
 
-          Logger.info(`✅ [pgvector_insert_with_embedding] ID: ${insertedId}`);
+          dbLogger.info({ tool: "pgvector_insert_with_embedding", id: insertedId }, "✅ Données insérées");
 
           let output = `✅ **Données insérées avec embedding**\n\n`;
           output += `📊 Table: ${args.schema}.${args.tableName}\n`;
@@ -737,7 +739,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_insert_with_embedding]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_insert_with_embedding" }, "Error in insert_with_embedding");
           return this.formatError(error, "Insertion avec vecteur auto");
         }
       },
@@ -892,7 +894,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_search]", error.message);
+          toolLogger.error({ err: error, tool: "pgvector_search", table: args.tableName }, "Error in vector search tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -980,7 +982,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_generate_random]", error.message);
+          toolLogger.error({ err: error, tool: "pgvector_generate_random" }, "Error in pgvector_generate_random tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -1066,7 +1068,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           await client.release();
 
-          Logger.info(`✅ Index ${indexName} créé`);
+          dbLogger.info({ indexName, table: args.tableName }, "✅ Index vectoriel créé");
           return (
             `✅ Index vectoriel créé:\n` +
             `   Nom: ${indexName}\n` +
@@ -1078,7 +1080,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             `💡 HNSW est recommandé pour la plupart des cas d'usage`
           );
         } catch (error: any) {
-          Logger.error("❌ [pgvector_create_index]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_create_index", table: args.tableName }, "Error in create_index tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -1131,8 +1133,9 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
           await client.release();
 
           const deletedCount = beforeCount - afterCount;
-          Logger.info(
-            `✅ ${deletedCount} vecteur(s) supprimé(s) de ${args.tableName}`,
+          dbLogger.info(
+            { deletedCount, table: args.tableName },
+            "✅ Vecteur(s) supprimé(s)"
           );
 
           return (
@@ -1143,7 +1146,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             `   Restants: ${afterCount}`
           );
         } catch (error: any) {
-          Logger.error("❌ [pgvector_delete]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_delete", table: args.tableName }, "Error in pgvector_delete tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -1244,7 +1247,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_stats]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_stats", table: args.tableName }, "Error in pgvector_stats tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -1306,7 +1309,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_list_tables]", error.message);
+          toolLogger.error({ err: error, tool: "pgvector_list_tables" }, "Error in pgvector_list_tables tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -1403,8 +1406,9 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           await client.release();
 
-          Logger.info(
-            `✅ ${result.rows.length} vecteurs insérés dans ${args.tableName}`,
+          dbLogger.info(
+            { count: result.rows.length, table: args.tableName },
+            "✅ Vecteurs insérés en lot"
           );
           return (
             `✅ Insertion en lot réussie:\n` +
@@ -1415,7 +1419,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             `   Moyenne: ${(duration / result.rows.length).toFixed(2)}ms/vecteur`
           );
         } catch (error: any) {
-          Logger.error("❌ [pgvector_batch_insert]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_batch_insert", table: args.tableName }, "Error in batch_insert_vectors tool execution");
           return this.formatError(error, "Erreur");
         }
       },
@@ -1470,7 +1474,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             return `⚠️ Aucune ligne mise à jour - Vérifiez votre clause WHERE: ${args.whereClause}`;
           }
 
-          Logger.info(`✅ Vecteur mis à jour dans ${args.tableName}`);
+          dbLogger.info({ table: args.tableName }, `✅ Vecteur mis à jour dans ${args.tableName}`);
           return (
             `✅ Vecteur mis à jour:\n` +
             `   Table: ${args.schema}.${args.tableName}\n` +
@@ -1479,7 +1483,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
             `   Nouvelles dimensions: ${args.vector.length}`
           );
         } catch (error: any) {
-          Logger.error("❌ [pgvector_update]", error.message);
+          dbLogger.error({ err: error, tool: "pgvector_update", table: args.tableName }, "Error in pgvector_update tool execution");
           return this.formatError(error, "Mise à jour de vecteur");
         }
       },
@@ -1681,7 +1685,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_validate]", error.message);
+          toolLogger.error("❌ [pgvector_validate]", error.message);
           return this.formatError(error, "Validation de vecteurs");
         }
       },
@@ -1787,7 +1791,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_normalize]", error.message);
+          toolLogger.error("❌ [pgvector_normalize]", error.message);
           return this.formatError(error, "Normalisation de vecteur");
         }
       },
@@ -2014,7 +2018,7 @@ Colonnes supportées: symbol, study_name, technical_data, llm_interpretation, se
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [pgvector_diagnostic]", error.message);
+          toolLogger.error("❌ [pgvector_diagnostic]", error.message);
           return this.formatError(error, "Diagnostic");
         }
       },
@@ -2185,7 +2189,7 @@ Aucune requête trouvée avec au moins ${args.minExecutions} exécutions.
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [analyze_slow_queries]", error.message);
+          toolLogger.error("❌ [analyze_slow_queries]", error.message);
           return this.formatError(error, "Analyse des requêtes lentes");
         }
       },

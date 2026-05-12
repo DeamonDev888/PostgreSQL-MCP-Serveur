@@ -3,7 +3,7 @@
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { Pool } from "pg";
-import Logger from "../utils/logger.js";
+import { toolLogger } from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 
 /**
@@ -28,7 +28,7 @@ export class IntelligentSearchTools {
     this.benchmarkSearch();
     this.getSuggestions();
 
-    Logger.info("✅ Outils de recherche intelligente enregistrés (5 outils)");
+    toolLogger.info("✅ Outils de recherche intelligente enregistrés (5 outils)");
   }
 
   /**
@@ -134,7 +134,7 @@ export class IntelligentSearchTools {
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [intelligent_search]", error.message);
+          toolLogger.error({ err: error, tool: "intelligent_search", query: args.query }, "Error in intelligent_search tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -183,7 +183,7 @@ export class IntelligentSearchTools {
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [search_with_mode]", error.message);
+          toolLogger.error({ err: error, tool: "search_with_mode", mode: args.mode }, "Error in search_with_mode tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -233,7 +233,7 @@ export class IntelligentSearchTools {
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [analyze_query]", error.message);
+          toolLogger.error({ err: error, tool: "analyze_query" }, "Error in analyze_query tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -301,7 +301,7 @@ export class IntelligentSearchTools {
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [benchmark_search]", error.message);
+          toolLogger.error({ err: error, tool: "benchmark_search" }, "Error in benchmark_search tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -326,7 +326,7 @@ export class IntelligentSearchTools {
       }),
       execute: async (args) => {
         try {
-          const suggestions = await this.searchService.getSuggestions!(
+          const suggestions = await this.searchService.getSuggestions(
             args.partialQuery,
             args.tableName,
             "content",
@@ -348,7 +348,7 @@ export class IntelligentSearchTools {
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [get_search_suggestions]", error.message);
+          toolLogger.error({ err: error, tool: "get_search_suggestions" }, "Error in get_search_suggestions tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
