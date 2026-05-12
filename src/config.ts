@@ -17,6 +17,41 @@ function getSearchPaths(): string[] {
   const cwd = process.cwd();
   const paths: string[] = [];
 
+  // 0. Serveur local .env (PRIORITÉ ABSOLUE - avant CWD)
+  // Le serveur doit charger SON propre .env, pas celui du CWD
+  paths.push(resolve(__dirname, '.env'));           // serveur_PostGreSQL/.env
+  paths.push(resolve(__dirname, '../../.env'));     // Serveur MCP/.env
+
+  // 0b. .overmind global .env (fallback global OverMind - AVANT CWD)
+  //    Utilise HOME/UserProfile pour éviter chemin codé
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  if (homeDir) {
+    paths.push(resolve(homeDir, '.overmind/.env'));
+  }
+
+  // 0c. INIT_CWD - là où npm a été invoqué (plus fiable que __dirname pour global install)
+  //    Permet de trouver le .env du projet même en install global npm
+  if (process.env.INIT_CWD) {
+    paths.push(resolve(process.env.INIT_CWD, '.env'));
+    paths.push(resolve(process.env.INIT_CWD, '../.env'));
+  } else {
+    // Fallback: si INIT_CWD non disponible, marcher vers le haut du CWD
+    // pour trouver le premier .env = projet parent probable
+    let parentCwd = cwd;
+    const maxDepth = 5;
+    for (let i = 0; i < maxDepth; i++) {
+      const parentEnv = resolve(parentCwd, '.env');
+      if (fs.existsSync(parentEnv)) break;
+      const parentDir = resolve(parentCwd, '..');
+      if (parentDir === parentCwd) break; // Root reached
+      parentCwd = parentDir;
+    }
+    if (parentCwd !== cwd) {
+      paths.push(resolve(parentCwd, '.env'));
+      paths.push(resolve(parentCwd, '../.env'));
+    }
+  }
+
   // 1. Répertoire courant (CWD) — là où l'utilisateur lance la cmd
   paths.push(resolve(cwd, '.env'));
 
@@ -30,17 +65,7 @@ function getSearchPaths(): string[] {
   //    __dirname = node_modules/overmind-postgres-mcp/dist
   //    parent   = node_modules/overmind-postgres-mcp
   //    grand-p  = node_modules
-  paths.push(resolve(__dirname, '../../.env')); // node_modules/.env
   paths.push(resolve(__dirname, '../../../.env')); // project/.env
-
-  // 5. Dossier "serveur_PostGreSQL" sibling de Workflow (si installé ensemble)
-  //    Chemine sibling: Workflow et serveur_PostGreSQL sont dans "Serveur MCP/"
-  paths.push(resolve(__dirname, '../../../serveur_PostGreSQL/.env'));
-  paths.push(resolve(__dirname, '../../Workflow/.env'));
-
-  // 6. CWD + Workflow/.env (si workflow existe dans le parent)
-  paths.push(resolve(cwd, '../Workflow/.env'));
-  paths.push(resolve(cwd, '../../Workflow/.env'));
 
   return paths;
 }
@@ -83,7 +108,7 @@ const workflowOpenRouterKey =
 if (!localOpenRouterKey && !workflowOpenRouterKey) {
   missingVars.push("OPENROUTER_API_KEY (requis pour embeddings)");
 } else if (!localOpenRouterKey && workflowOpenRouterKey) {
-  warningVars.push("OPENROUTER_API_KEY utilisé depuis Workflow/.env (fallback)");
+  warningVars.push("OPENROUTER_API_KEY utilisé depuis un .env sibling (fallback)");
 }
 
 if (!process.env.EMBEDDING_PROVIDER && localOpenRouterKey) {
@@ -167,30 +192,34 @@ for (const p of searchPaths) {
   }
 }
 
-// ─── FALLBACK: Charger aussi le .env d'Overmind Workflow ──────────────────────
-// Chemins sibling — Workflow et serveur_PostGreSQL sont dans le même parent
-// Functionne en local ET en npm install
-const cwd = process.cwd();
-const workflowEnvPaths = [
-  resolve(__dirname, '../../Workflow/.env'),     // node_modules/../Workflow/.env
-  resolve(__dirname, '../../../Workflow/.env'), // node_modules/../Workflow/.env (si plus profond)
-  resolve(cwd, '../Workflow/.env'),              // CWD parent
-  resolve(cwd, '../../Workflow/.env'),            // CWD grand-parent
-  resolve(__dirname, '../../../serveur_PostGreSQL/.env'), // sibling served
+// ─── FALLBACK: Sibling directories (serveur_PostGreSQL parent) ─────────────────
+// On cherche le .env du parent du serveur (générique, pas de nom codé)
+// Fonctionne que le sibling s'appelle Workflow, agents, ou autre
+const siblingEnvPaths = [
+  resolve(__dirname, '../../../.env'),             // sibling parent via npm
+  resolve(__dirname, '../../.env'),              // Serveur MCP parent (local dev)
 ];
 
-let workflowEnvLoaded = false;
-for (const p of workflowEnvPaths) {
+let siblingEnvLoaded = false;
+for (const p of siblingEnvPaths) {
   if (fs.existsSync(p)) {
     config({ path: p, override: false }); // override=false = ne remplace pas les vars existantes
-    workflowEnvLoaded = true;
+    siblingEnvLoaded = true;
     break;
   }
 }
 
-// Log si fallback utilisé (debug)
-if (workflowEnvLoaded) {
-  console.error("🔓 [CONFIG] .env Overmind Workflow chargé en fallback");
+// Log si fallback sibling utilisé (debug)
+if (siblingEnvLoaded) {
+  console.error("🔓 [CONFIG] .env sibling chargé en fallback");
+}
+
+// ─── Normalisation pre-Zod: POSTGRES_DB → POSTGRES_DATABASE ───────────────────
+// Le .overmind/.env utilise POSTGRES_DB (nommage OverMind)
+// On normalise vers POSTGRES_DATABASE pour la compatibilité Zod
+if (process.env.POSTGRES_DB && !process.env.POSTGRES_DATABASE) {
+  process.env.POSTGRES_DATABASE = process.env.POSTGRES_DB;
+  console.error("🔓 [CONFIG] POSTGRES_DATABASE normalisé depuis POSTGRES_DB (fallback .overmind)");
 }
 
 // ─── Fallback explicite des variables OpenRouter/Embeddings ─────────────────────
