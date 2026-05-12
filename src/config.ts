@@ -9,15 +9,43 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // =============================================================================
-// 🚨 VALIDATION CRITIQUE DU .ENV
+// 🚨 VALIDATION CRITIQUE DU .ENV - Chemins génériques pour npm install
 // =============================================================================
-const searchPaths = [
-  resolve(__dirname, "../../.env"),
-  resolve(__dirname, "../.env"),
-  resolve(process.cwd(), ".env"),
-  resolve(process.cwd(), "../Workflow/.env"),
-  resolve(dirname(fileURLToPath(import.meta.url)), "../../Workflow/.env"),
-];
+// Chemins en cascade: local → CWD → parent → grandparent
+// Fonctionne que le package soit installé en dev ou via npm
+function getSearchPaths(): string[] {
+  const cwd = process.cwd();
+  const paths: string[] = [];
+
+  // 1. Répertoire courant (CWD) — là où l'utilisateur lance la cmd
+  paths.push(resolve(cwd, '.env'));
+
+  // 2. Dossier parent du CWD (ex: project/parent/.env)
+  paths.push(resolve(cwd, '../.env'));
+
+  // 3. Grand-parent du CWD (ex: project/parent/grandparent/.env)
+  paths.push(resolve(cwd, '../../.env'));
+
+  // 4. Dossier parent de __dirname (workaround pour npm install)
+  //    __dirname = node_modules/overmind-postgres-mcp/dist
+  //    parent   = node_modules/overmind-postgres-mcp
+  //    grand-p  = node_modules
+  paths.push(resolve(__dirname, '../../.env')); // node_modules/.env
+  paths.push(resolve(__dirname, '../../../.env')); // project/.env
+
+  // 5. Dossier "serveur_PostGreSQL" sibling de Workflow (si installé ensemble)
+  //    Chemine sibling: Workflow et serveur_PostGreSQL sont dans "Serveur MCP/"
+  paths.push(resolve(__dirname, '../../../serveur_PostGreSQL/.env'));
+  paths.push(resolve(__dirname, '../../Workflow/.env'));
+
+  // 6. CWD + Workflow/.env (si workflow existe dans le parent)
+  paths.push(resolve(cwd, '../Workflow/.env'));
+  paths.push(resolve(cwd, '../../Workflow/.env'));
+
+  return paths;
+}
+
+const searchPaths = getSearchPaths();
 
 let envLoaded = false;
 let envPathUsed = "";
@@ -140,11 +168,29 @@ for (const p of searchPaths) {
 }
 
 // ─── FALLBACK: Charger aussi le .env d'Overmind Workflow ──────────────────────
-// Ce fallback fournit les credentials OpenRouter/Embeddings depuis Workflow/.env
-// si ils ne sont pas définis dans le .env local du serveur MCP.
-const workflowEnvPath = resolve(__dirname, "../../Workflow/.env");
-if (fs.existsSync(workflowEnvPath)) {
-  config({ path: workflowEnvPath, override: false }); // override=false = ne remplace pas les vars existantes
+// Chemins sibling — Workflow et serveur_PostGreSQL sont dans le même parent
+// Functionne en local ET en npm install
+const cwd = process.cwd();
+const workflowEnvPaths = [
+  resolve(__dirname, '../../Workflow/.env'),     // node_modules/../Workflow/.env
+  resolve(__dirname, '../../../Workflow/.env'), // node_modules/../Workflow/.env (si plus profond)
+  resolve(cwd, '../Workflow/.env'),              // CWD parent
+  resolve(cwd, '../../Workflow/.env'),            // CWD grand-parent
+  resolve(__dirname, '../../../serveur_PostGreSQL/.env'), // sibling served
+];
+
+let workflowEnvLoaded = false;
+for (const p of workflowEnvPaths) {
+  if (fs.existsSync(p)) {
+    config({ path: p, override: false }); // override=false = ne remplace pas les vars existantes
+    workflowEnvLoaded = true;
+    break;
+  }
+}
+
+// Log si fallback utilisé (debug)
+if (workflowEnvLoaded) {
+  console.error("🔓 [CONFIG] .env Overmind Workflow chargé en fallback");
 }
 
 // ─── Fallback explicite des variables OpenRouter/Embeddings ─────────────────────

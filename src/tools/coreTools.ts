@@ -3,7 +3,7 @@
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { Pool } from "pg";
-import Logger from "../utils/logger.js";
+import { toolLogger, dbLogger } from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 import { embeddingService } from "../services/embeddingService.js";
 import { DBOptimizer } from "../utils/dbOptimizer.js";
@@ -43,7 +43,7 @@ export class CoreTools {
     this.vectorize_row();
     this.help();
 
-    Logger.info("✅ Outils Core enregistrés (9 outils cohérents)");
+    toolLogger.info("✅ Outils Core enregistrés (9 outils cohérents)");
   }
 
   // ============================================================================
@@ -128,7 +128,7 @@ export class CoreTools {
 
           return "Diagnostic terminé";
         } catch (error: any) {
-          Logger.error("❌ [diagnose]", error.message);
+          toolLogger.error({ err: error, tool: "diagnose" }, "Error in diagnose tool execution");
           return `❌ Erreur: ${error.message}`;
         } finally {
           client.release();
@@ -248,7 +248,7 @@ export class CoreTools {
               return "❌ Type d'exploration invalide";
           }
         } catch (error: any) {
-          Logger.error("❌ [explore]", error.message);
+          toolLogger.error({ err: error, tool: "explore" }, "Error in explore tool execution");
           return `❌ Erreur: ${error.message}`;
         } finally {
           client.release();
@@ -414,7 +414,7 @@ MCP_PG_VECTOR({
             await client.release();
           }
         } catch (error: any) {
-          Logger.error("❌ [query]", error.message);
+          dbLogger.error({ err: error, sql: args.sql }, "❌ [query] execution failed");
 
           // Messages d'erreur contextuels pour LLM
           const errorMsg = error.message.toLowerCase();
@@ -444,6 +444,19 @@ MCP_PG_VECTOR({
           } else if (errorMsg.includes("violates foreign key")) {
             guidance = `\n\n💡 **Guide LLM:** Contrainte de clé étrangère violée.\n`;
             guidance += `Vérifiez que l'ID référencé existe dans la table parent.`;
+          } else if (
+            error.code === "23505" &&
+            (error.constraint === "unique_single_open_position" ||
+              errorMsg.includes("unique_single_open_position"))
+          ) {
+            guidance = `\n\n💡 **Guide LLM:** Single Position Principle — une position OPEN existe déjà.\n`;
+            guidance += `Utilisez: SELECT * FROM positions WHERE status = 'OPEN' LIMIT 1\n`;
+            guidance += `Fermez ou gérez la position existante avant d'en ouvrir une nouvelle.`;
+            dbLogger.warn({ constraint: error.constraint }, "⚠️ Single Position Principle triggered — position already OPEN");
+            return `⚠️ **Position déjà OUVERTE:** ${error.message}${guidance}`;
+          } else if (error.code === "23505") {
+            guidance = `\n\n💡 **Guide LLM:** Violation de contrainte d'unicité.\n`;
+            guidance += `Utilisez ON CONFLICT DO NOTHING ou ON CONFLICT (...) DO UPDATE pour gérer les doublons.`;
           }
 
           return `❌ **Erreur SQL:** ${error.message}${guidance}`;
@@ -536,7 +549,7 @@ MCP_PG_VECTOR({
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [search]", error.message);
+          toolLogger.error({ err: error, tool: "search" }, "Error in search tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -594,8 +607,9 @@ MCP_PG_VECTOR({
 
             const embeddingText =
               textParts.join(" | ") || JSON.stringify(args.data);
-            Logger.info(
-              `🔄 Génération embedding pour: "${embeddingText.substring(0, 50)}..."`,
+            dbLogger.info(
+              { text: embeddingText.substring(0, 50) + "..." },
+              "🔄 Génération embedding"
             );
 
             const embedding = await embeddingService.generateEmbedding(
@@ -624,7 +638,7 @@ MCP_PG_VECTOR({
             `${args.generateEmbedding ? "🧠 Embedding généré: " + args.dimensions + "D\n" : ""}`
           );
         } catch (error: any) {
-          Logger.error("❌ [insert]", error.message);
+          dbLogger.error({ err: error, table: args.table }, "❌ [insert] execution failed");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -725,7 +739,7 @@ MCP_PG_VECTOR({
               return "❌ Action invalide";
           }
         } catch (error: any) {
-          Logger.error("❌ [manage_vectors]", error.message);
+          dbLogger.error({ err: error, tool: "manage_vectors", action: args.action }, "Error in manage_vectors execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -810,7 +824,7 @@ MCP_PG_VECTOR({
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [optimize]", error.message);
+          toolLogger.error({ err: error, tool: "optimize" }, "Error in optimize tool execution");
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -878,7 +892,7 @@ MCP_PG_VECTOR({
             client.release();
           }
         } catch (error: any) {
-          Logger.error("❌ [vectorize_row]", error.message);
+          dbLogger.error({ err: error, tool: "vectorize_row", table: args.table, id: args.id }, "Error in vectorize_row execution");
           return `❌ Erreur: ${error.message}`;
         }
       },

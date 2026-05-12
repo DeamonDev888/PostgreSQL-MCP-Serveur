@@ -42,11 +42,11 @@ export interface MissingIndex {
   estimated_gain: string;
 }
 
-// Classe pour l'optimisation de base de donnÃ©es
+// Classe pour l'optimisation de base de données
 export class DBOptimizer {
   constructor(private pool: Pool) {}
 
-  // Obtenir les requÃªtes lentes depuis pg_stat_statements
+  // Obtenir les requêtes lentes depuis pg_stat_statements
   async getSlowQueries(limit: number = 10): Promise<SlowQuery[]> {
     const query = `
       SELECT
@@ -71,7 +71,7 @@ export class DBOptimizer {
       }));
     } catch (error: any) {
       throw new Error(
-        `Erreur lors de la rÃ©cupÃ©ration des requÃªtes lentes: ${error.message}`,
+        `Erreur lors de la récupération des requêtes lentes: ${error.message}`,
       );
     }
   }
@@ -154,16 +154,16 @@ export class DBOptimizer {
       }));
     } catch (error: any) {
       throw new Error(
-        `Erreur lors de la rÃ©cupÃ©ration des statistiques: ${error.message}`,
+        `Erreur lors de la récupération des statistiques: ${error.message}`,
       );
     }
   }
 
-  // SuggÃ©rer des index manquants basÃ©s sur les requÃªtes lentes
+  // Suggérer des index manquants basés sur les requêtes lentes
   async suggestMissingIndexes(): Promise<MissingIndex[]> {
     const suggestions: MissingIndex[] = [];
 
-    // Analyser les requÃªtes avec beaucoup de seq_scan
+    // Analyser les requêtes avec beaucoup de seq_scan
     const tablesWithHighSeqScan = await this.pool.query(`
       SELECT
         relname as tablename,
@@ -176,7 +176,7 @@ export class DBOptimizer {
     `);
 
     for (const table of tablesWithHighSeqScan.rows) {
-      // SuggÃ©rer des index basÃ©s sur les colonnes frÃ©quemment utilisÃ©es dans WHERE
+      // Suggérer des index basés sur les colonnes fréquemment utilisées dans WHERE
       const commonWhereColumns = await this.pool.query(
         `
         SELECT
@@ -196,7 +196,7 @@ export class DBOptimizer {
 
       if (commonWhereColumns.rows.length > 0) {
         const columns = commonWhereColumns.rows
-          .slice(0, 3) // Prendre les 3 premiÃ¨res colonnes
+          .slice(0, 3) // Prendre les 3 premières colonnes
           .map((col) => col.column_name)
           .join(", ");
 
@@ -205,7 +205,7 @@ export class DBOptimizer {
           columns,
           suggested_index: `CREATE INDEX idx_${table.tablename}_${commonWhereColumns.rows[0].column_name} ON ${table.tablename} (${columns});`,
           potential_impact: table.seq_scan > 10000 ? "HIGH" : "MEDIUM",
-          estimated_gain: `RÃ©duction potentielle de ${Math.round((table.seq_scan / (table.seq_scan + 100)) * 100)}% des sequential scans`,
+          estimated_gain: `Réduction potentielle de ${Math.round((table.seq_scan / (table.seq_scan + 100)) * 100)}% des sequential scans`,
         });
       }
     }
@@ -213,7 +213,7 @@ export class DBOptimizer {
     return suggestions;
   }
 
-  // Analyser les tables qui nÃ©cessitent un VACUUM
+  // Analyser les tables qui nécessitent un VACUUM
   async getTablesNeedingVacuum(): Promise<any[]> {
     const query = `
       SELECT
@@ -294,7 +294,7 @@ export class DBOptimizer {
     }
   }
 
-  // Analyser les requÃªtes en cours d'exÃ©cution
+  // Analyser les requêtes en cours d'exécution
   async getRunningQueries(): Promise<any[]> {
     const query = `
       SELECT
@@ -319,22 +319,22 @@ export class DBOptimizer {
       return result.rows;
     } catch (error: any) {
       throw new Error(
-        `Erreur lors de l'analyse des requÃªtes: ${error.message}`,
+        `Erreur lors de l'analyse des requêtes: ${error.message}`,
       );
     }
   }
 
-  // GÃ©nÃ©rer un rapport d'optimisation complet
+  // Générer un rapport d'optimisation complet
   async generateOptimizationReport(): Promise<string> {
     try {
       const report = [];
 
-      report.push("# ðŸ“Š Rapport d'Optimisation PostgreSQL\n");
-      report.push(`*GÃ©nÃ©rÃ© le ${new Date().toLocaleString("fr-FR")}*\n`);
+      report.push("# 📊 Rapport d'Optimisation PostgreSQL\n");
+      report.push(`*Généré le ${new Date().toLocaleString("fr-FR")}*\n`);
 
       // 1. Cache Hit Ratios
       const cacheStats = await this.getCacheHitRatios();
-      report.push("## ðŸŽ¯ Performance du Cache");
+      report.push("## 🎯 Performance du Cache");
       report.push(
         `- **Cache tables**: ${((cacheStats.heap_ratio || 0) * 100).toFixed(2)}%`,
       );
@@ -344,15 +344,15 @@ export class DBOptimizer {
 
       if ((cacheStats.heap_ratio || 0) < 0.95) {
         report.push(
-          "âš ï¸  **Recommandation**: Augmenter shared_buffers pour amÃ©liorer le cache hit ratio",
+          "⚠️ **Recommandation**: Augmenter shared_buffers pour améliorer le cache hit ratio",
         );
       }
       report.push("");
 
-      // 2. Tables nÃ©cessitant un VACUUM
+      // 2. Tables nécessitant un VACUUM
       const vacuumTables = await this.getTablesNeedingVacuum();
       if (vacuumTables.length > 0) {
-        report.push("## ðŸ§¹ Tables nÃ©cessitant un VACUUM");
+        report.push("## 🧹 Tables nécessitant un VACUUM");
         vacuumTables.slice(0, 5).forEach((table) => {
           report.push(
             `- **${table.tablename}**: ${table.dead_tuple_percent}% de tuples morts (${table.table_size})`,
@@ -361,27 +361,27 @@ export class DBOptimizer {
         report.push("");
       }
 
-      // 3. Index non utilisÃ©s
+      // 3. Index non utilisés
       const unusedIndexes = await this.analyzeIndexUsage();
       const unused = unusedIndexes.filter((idx) => idx.usage === 0);
       if (unused.length > 0) {
-        report.push("## ðŸ—‘ï¸  Index non utilisÃ©s");
+        report.push("## 🗑️ Index non utilisés");
         unused.slice(0, 3).forEach((idx) => {
           report.push(
             `- **${idx.indexname}** sur ${idx.tablename} (${idx.size})`,
           );
         });
         report.push(
-          "ðŸ’¡ **Action**: ConsidÃ©rez supprimer ces index pour amÃ©liorer les performances d'Ã©criture",
+          "💡 **Action**: Considérez supprimer ces index pour améliorer les performances d'écriture",
         );
         report.push("");
       }
 
-      // 4. RequÃªtes lentes (si pg_stat_statements est activÃ©)
+      // 4. Requêtes lentes (si pg_stat_statements est activé)
       try {
         const slowQueries = await this.getSlowQueries(3);
         if (slowQueries.length > 0) {
-          report.push("## ðŸ Œ RequÃªtes lentes");
+          report.push("## 🐌 Requêtes lentes");
           slowQueries.forEach((query, index) => {
             report.push(
               `${index + 1}. **Temps moyen**: ${query.duration.toFixed(2)}ms (${query.calls} appels)`,
@@ -393,10 +393,10 @@ export class DBOptimizer {
           report.push("");
         }
       } catch {
-        // pg_stat_statements n'est peut-Ãªtre pas activÃ©
-        report.push("## ðŸ“ˆ Note");
+        // pg_stat_statements n'est peut-être pas activé
+        report.push("## 📈 Note");
         report.push(
-          "Activer `pg_stat_statements` pour analyser les requÃªtes lentes",
+          "Activer `pg_stat_statements` pour analyser les requêtes lentes",
         );
         report.push("");
       }
@@ -404,7 +404,7 @@ export class DBOptimizer {
       // 5. Suggestions d'index
       const missingIndexes = await this.suggestMissingIndexes();
       if (missingIndexes.length > 0) {
-        report.push("## ðŸ’¡ Suggestions d'index");
+        report.push("## 💡 Suggestions d'index");
         missingIndexes.slice(0, 3).forEach((idx) => {
           report.push(`- **${idx.table}** (${idx.potential_impact} impact)`);
           report.push(`  ${idx.suggested_index}`);
@@ -412,15 +412,15 @@ export class DBOptimizer {
         report.push("");
       }
 
-      // 6. RequÃªtes actives et locks
+      // 6. Requêtes actives et locks
       const activeQueries = await this.getRunningQueries();
       const activeLocks = await this.getActiveLocks();
 
       if (activeQueries.length > 0 || activeLocks.length > 0) {
-        report.push("## âš¡ ActivitÃ© actuelle");
+        report.push("## ⚡ Activité actuelle");
         if (activeQueries.length > 0) {
           report.push(
-            `- **${activeQueries.length} requÃªte(s) en cours d'exÃ©cution**`,
+            `- **${activeQueries.length} requête(s) en cours d'exécution**`,
           );
         }
         if (activeLocks.length > 0) {
@@ -431,7 +431,7 @@ export class DBOptimizer {
 
       return report.join("\n");
     } catch (error: any) {
-      return `â Œ Erreur lors de la gÃ©nÃ©ration du rapport: ${error.message}`;
+      return `❌ Erreur lors de la génération du rapport: ${error.message}`;
     }
   }
 }

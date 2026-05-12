@@ -1,75 +1,92 @@
-import fs from "fs";
+import pino from "pino";
 import path from "path";
 
-class Logger {
-  private logDir: string;
-  private logFile: string;
-  private stream: fs.WriteStream | null = null;
-  private isDev: boolean;
+/**
+ * ============================================================================
+ * SUPER-PINO LOGGER - PostgreSQL Edition
+ * ============================================================================
+ */
 
-  constructor() {
-    this.logDir = path.join(process.cwd(), "logs");
-    this.logFile = path.join(
-      this.logDir,
-      `postgresql-mcp-${new Date().toISOString().split("T")[0]}.log`,
-    );
-    this.isDev = process.env.NODE_ENV !== "production";
+const REDACT_PATHS = [
+  "*.password",
+  "*.api_key",
+  "*.token",
+  "*.secret",
+  "req.headers.authorization",
+  "*.email",
+  "db.password",
+  "POSTGRES_PASSWORD",
+];
 
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
-    }
+const DEFAULT_LOG_DIR = path.join(process.cwd(), "logs");
+const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "nexus-postgresql.log");
+const GLOBAL_LOG_PATH = "C:\\SierraChart\\ACS_Source\\BTCacsil\\logs\\nexus-postgresql.log";
 
-    this.stream = fs.createWriteStream(this.logFile, { flags: "a" });
-  }
-
-  private formatMessage(level: string, ...args: any[]): string {
-    const timestamp = new Date().toISOString();
-    const message = args
-      .map((arg) =>
-        typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg),
-      )
-      .join(" ");
-
-    return `[${timestamp}] [${level}] ${message}`;
-  }
-
-  private writeLog(level: string, ...args: any[]): void {
-    const message = this.formatMessage(level, ...args);
-
-    if (this.stream) {
-      this.stream.write(message + "\n");
-    }
-
-    if (this.isDev) {
-      process.stderr.write(message + "\n");
-    }
-  }
-
-  info(...args: any[]): void {
-    this.writeLog("INFO", ...args);
-  }
-
-  warn(...args: any[]): void {
-    this.writeLog("WARN", ...args);
-  }
-
-  error(...args: any[]): void {
-    this.writeLog("ERROR", ...args);
-    process.stderr.write(this.formatMessage("ERROR", ...args) + "\n");
-  }
-
-  debug(...args: any[]): void {
-    if (this.isDev) {
-      this.writeLog("DEBUG", ...args);
-    }
-  }
-
-  close(): void {
-    if (this.stream) {
-      this.stream.end();
-      this.stream = null;
-    }
-  }
+function getFileTargets(): string[] {
+  const raw = process.env.LOG_FILES ?? "";
+  const paths = raw.split(",").map(p => p.trim()).filter(Boolean);
+  const userPaths = paths.map(p => path.isAbsolute(p) ? p : path.resolve(process.cwd(), p));
+  return [DEFAULT_LOG_FILE, GLOBAL_LOG_PATH, ...userPaths];
 }
 
-export default new Logger();
+const fileTargets = getFileTargets();
+
+const transport = pino.transport({
+  targets: [
+    {
+      target: "pino-pretty",
+      level: process.env.LOG_LEVEL || "debug",
+      options: {
+        destination: 2, // STDERR for MCP compatibility
+        colorize: true,
+        translateTime: "SYS:yyyy-mm-dd HH:MM:ss",
+        ignore: "pid,hostname,service,version",
+        messageFormat: "\x1b[34m[{module}]\x1b[0m {msg}", // Blue for Postgres
+        errorLikeObjectKeys: ["err", "error"],
+      } as any,
+    },
+    ...fileTargets.map((filePath) => ({
+      target: "pino-roll",
+      level: process.env.LOG_LEVEL || "info",
+      options: {
+        file: filePath,
+        frequency: "daily",
+        dateFormat: "yyyy-MM-dd",
+        size: "50m",
+        limit: { count: 30 },
+        mkdir: true,
+      },
+    })),
+  ],
+});
+
+export const rootLogger = pino(
+  {
+    name: "postgresql-mcp",
+    level: process.env.LOG_LEVEL || "info",
+    redact: {
+      paths: REDACT_PATHS,
+      censor: "[CONFIDENTIEL]",
+    },
+    serializers: {
+      err: pino.stdSerializers.err,
+      error: pino.stdSerializers.err,
+    },
+    base: {
+      service: "postgresql-mcp-server",
+      version: "1.3.0",
+    },
+  },
+  transport
+);
+
+// Specialized Child Loggers
+export const dbLogger     = rootLogger.child({ module: "DATABASE" });
+export const serverLogger = rootLogger.child({ module: "SERVER" });
+export const toolLogger   = rootLogger.child({ module: "TOOL" });
+export const vectorLogger = rootLogger.child({ module: "VECTOR" });
+
+rootLogger.info({ targets: fileTargets }, "Super-Pino V2.0 initialized for PostgreSQL-MCP");
+
+export default rootLogger;
+
