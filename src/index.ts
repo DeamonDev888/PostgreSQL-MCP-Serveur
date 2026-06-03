@@ -7,9 +7,6 @@ import config, { dbConfig } from "./config.js";
 import { serverLogger, dbLogger, rootLogger } from "./utils/logger.js";
 
 import { CoreTools } from "./tools/coreTools.js";
-import { IntelligentSearchTools } from "./tools/intelligentSearch.js";
-import { PGVectorTools } from "./tools/pgvector.js";
-import { MaintenanceTools } from "./tools/maintenanceTools.js";
 import { DBOptimizer } from "./utils/dbOptimizer.js";
 
 // 🛡️ ULTIMATE SHIELD: Proxy process.stdout.write to redirect non-JSON data to stderr
@@ -264,18 +261,20 @@ async function runServer() {
     const coreTools = new CoreTools(pool, server);
     coreTools.registerTools();
 
-    const searchTools = new IntelligentSearchTools(pool, server);
-    searchTools.registerTools();
-
-    const vectorTools = new PGVectorTools(pool, server);
-    vectorTools.registerTools();
-
-    const maintenanceTools = new MaintenanceTools(pool, server);
-    maintenanceTools.registerTools();
-
     // 3. Start the MCP server
-    await server.start();
-    serverLogger.info("✅ [BOOT] MCP Server started and listening for requests");
+    const port = parseInt(process.env.FASTMCP_PORT || '5433', 10);
+    const host = process.env.FASTMCP_HOST || 'localhost';
+    const endpoint = process.env.FASTMCP_ENDPOINT || '/mcp';
+    await server.start({
+      transportType: 'httpStream',
+      httpStream: {
+        port,
+        host,
+        endpoint: endpoint as `/${string}`,
+        stateless: true,
+      },
+    });
+    serverLogger.info(`✅ [BOOT] MCP Server started on HTTP SSE ${host}:${port}${endpoint}`);
 
     // 4. Background Maintenance & Monitoring
     if (isReady) {

@@ -14,38 +14,27 @@ function createMockPool(queryResult: any = { rows: [], rowCount: 0 }) {
   };
 }
 
-describe("IntelligentSearchTools - Registration", () => {
-  it("registers 5 intelligent search tools", async () => {
-    const { IntelligentSearchTools } = await import(
-      "../src/tools/intelligentSearch.js"
+describe("CoreTools - Registration", () => {
+  it("registers 10 core tools correctly", async () => {
+    const { CoreTools } = await import(
+      "../src/tools/coreTools.js"
     );
     const pool = createMockPool();
     const mockServer = { addTool: vi.fn() };
-    const tools = new IntelligentSearchTools(pool as any, mockServer as any);
+    const tools = new CoreTools(pool as any, mockServer as any);
     tools.registerTools();
 
-    expect(mockServer.addTool).toHaveBeenCalledTimes(5);
+    expect(mockServer.addTool).toHaveBeenCalledTimes(10);
     const names = mockServer.addTool.mock.calls.map((c: any) => c[0].name);
-    expect(names).toContain("intelligent_search");
-    expect(names).toContain("search_with_mode");
-    expect(names).toContain("analyze_query");
-    expect(names).toContain("benchmark_search");
-    expect(names).toContain("get_search_suggestions");
-  });
-});
-
-describe("PGVectorTools - Registration", () => {
-  it("registers pgvector tools", async () => {
-    const { PGVectorTools } = await import("../src/tools/pgvector.js");
-    const pool = createMockPool();
-    const mockServer = { addTool: vi.fn() };
-    const tools = new PGVectorTools(pool as any, mockServer as any);
-    tools.registerTools();
-
-    expect(mockServer.addTool.mock.calls.length).toBeGreaterThan(5);
-    const names = mockServer.addTool.mock.calls.map((c: any) => c[0].name);
-    expect(names).toContain("pgvector_check_extension");
-    expect(names).toContain("pgvector_search");
-    expect(names).toContain("pgvector_stats");
+    expect(names).toContain("diagnose");
+    expect(names).toContain("explore");
+    expect(names).toContain("MCP_PG_VECTOR");
+    expect(names).toContain("search");
+    expect(names).toContain("insert");
+    expect(names).toContain("manage_vectors");
+    expect(names).toContain("optimize");
+    expect(names).toContain("vectorize_row");
+    expect(names).toContain("mcp_db_maintenance");
+    expect(names).toContain("help");
   });
 });

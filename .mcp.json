@@ -1,11 +1,3 @@
 {
-  "mcpServers": {
-    "postgresql": {
-      "command": "node",
-      "args": ["C:/Users/Deamon/Desktop/Backup/Serveur MCP/serveur_PostGreSQL/dist/index.js"],
-      "env": {
-        "NODE_ENV": "production"
-      }
-    }
-  }
+  "mcpServers": {}
 }
