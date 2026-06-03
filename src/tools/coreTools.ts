@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { Pool } from "pg";
@@ -7,6 +5,7 @@ import { toolLogger, dbLogger } from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 import { embeddingService } from "../services/embeddingService.js";
 import { DBOptimizer } from "../utils/dbOptimizer.js";
+import { SchemaManagerService } from "../services/schemaManagerService.js";
 import {
   validateTableName,
   validateColumnName,
@@ -17,19 +16,21 @@ import {
 /**
  * Outils MCP Core - Refactorisation pour cohérence et simplicité
  *
- * 9 outils IMPLICITES et COHÉRENTS au lieu de 38 dispersés
+ * 10 outils IMPLICITES et COHÉRENTS au lieu de 38 dispersés
  */
 export class CoreTools {
   private pool: Pool;
   private server: FastMCP;
   private searchService: IntelligentSearchService;
   private optimizer: DBOptimizer;
+  private schemaManager: SchemaManagerService;
 
   constructor(pool: Pool, server: FastMCP) {
     this.pool = pool;
     this.server = server;
     this.searchService = new IntelligentSearchService(pool);
     this.optimizer = new DBOptimizer(pool);
+    this.schemaManager = new SchemaManagerService(pool);
   }
 
   registerTools(): void {
@@ -41,9 +42,10 @@ export class CoreTools {
     this.manageVectors();
     this.optimize();
     this.vectorize_row();
+    this.mcp_db_maintenance();
     this.help();
 
-    toolLogger.info("✅ Outils Core enregistrés (9 outils cohérents)");
+    toolLogger.info("✅ Outils Core enregistrés (10 outils cohérents)");
   }
 
   // ============================================================================
@@ -900,6 +902,7 @@ MCP_PG_VECTOR({
   }
 
   // ============================================================================
+  // ============================================================================
   // 9. HELP - Aide Contextuelle
   // ============================================================================
   private help(): void {
@@ -910,21 +913,23 @@ MCP_PG_VECTOR({
         topic: z
           .string()
           .optional()
-          .describe("Sujet spécifique (search, query, insert, etc.)"),
+          .describe("Sujet spécifique (search, MCP_PG_VECTOR, insert, etc.)"),
       }),
       execute: async (args) => {
         if (!args.topic) {
           return (
             `❓ **Aide - Outils MCP Core**\n\n` +
-            `🤖 **9 outils simples et cohérents:**\n\n` +
+            `🤖 **10 outils simples et cohérents:**\n\n` +
             `1. 🔍 **diagnose** - Diagnostic complet (connexion, performance)\n` +
             `2. 🗺️ **explore** - Explorer bases, tables, schémas\n` +
-            `3. ⚡ **query** - Exécuter des requêtes SQL\n` +
-            `4. 🔍 **search** - Recherche intelligente (auto-détection)\n` +
+            `3. ⚡ **MCP_PG_VECTOR** - Exécuter des requêtes SQL et Vector\n` +
+            `4. 🔍 **search** - Recherche sémantique / hybride intelligente\n` +
             `5. 📥 **insert** - Insérer données (avec/sans embedding)\n` +
             `6. 🧬 **manage_vectors** - Gestion vecteurs (création, index)\n` +
             `7. ⚡ **optimize** - Optimiser index, requêtes, tables\n` +
-            `8. ❓ **help** - Cette aide\n\n` +
+            `8. 🧠 **vectorize_row** - Générer un vecteur pour une ligne existante\n` +
+            `9. 🔧 **mcp_db_maintenance** - Tâches de maintenance et d'harmonisation de schéma\n` +
+            `10. ❓ **help** - Cette aide\n\n` +
             `💡 **Exemples:**\n` +
             `• help topic: "search" - Aide sur la recherche\n` +
             `• help topic: "insert" - Aide sur l'insertion\n`
@@ -979,19 +984,19 @@ MCP_PG_VECTOR({
               `}`
             );
 
-          case "query":
+          case "mcp_pg_vector":
             return (
-              `⚡ **Aide - Requêtes SQL**\n\n` +
+              `⚡ **Aide - Requêtes SQL (MCP_PG_VECTOR)**\n\n` +
               `**Usage (lecture seule):**\n` +
               `{\n` +
-              `  "tool": "query",\n` +
+              `  "tool": "MCP_PG_VECTOR",\n` +
               `  "arguments": {\n` +
               `    "sql": "SELECT * FROM users LIMIT 10"\n` +
               `  }\n` +
               `}\n\n` +
               `**Avec modifications:**\n` +
               `{\n` +
-              `  "tool": "query",\n` +
+              `  "tool": "MCP_PG_VECTOR",\n` +
               `  "arguments": {\n` +
               `    "sql": "INSERT INTO users (name) VALUES ('John')",\n` +
               `    "readonly": false\n` +
@@ -1021,8 +1026,51 @@ MCP_PG_VECTOR({
             return (
               `❓ **Aide - ${args.topic}**\n\n` +
               `Utilisez "help" sans paramètre pour voir la liste des outils.\n` +
-              `Ou demandez: help topic: "search", "insert", "query", etc.`
+              `Ou demandez: help topic: "search", "insert", "MCP_PG_VECTOR", etc.`
             );
+        }
+      },
+    });
+  }
+
+  // ============================================================================
+  // 10. MCP_DB_MAINTENANCE - Tâches de Maintenance
+  // ============================================================================
+  private mcp_db_maintenance(): void {
+    this.server.addTool({
+      name: "mcp_db_maintenance",
+      description:
+        "🔧 Exécute les tâches de maintenance (harmonisation TIMESTAMPTZ, vérification intégrité)",
+      parameters: z.object({
+        action: z
+          .enum(["harmonize", "check", "full"])
+          .describe("Action à effectuer"),
+      }),
+      execute: async (args: { action: string }) => {
+        try {
+          const action = args.action as "harmonize" | "check" | "full";
+          dbLogger.info(`🔧 [MAINTENANCE] Execution action: ${action}`);
+
+          const report: any = {
+            timestamp: new Date().toISOString(),
+            action,
+            results: {},
+          };
+
+          if (action === "check" || action === "full") {
+            report.results.integrity =
+              await this.schemaManager.checkSchemaIntegrity();
+          }
+
+          if (action === "harmonize" || action === "full") {
+            report.results.harmonization =
+              await this.schemaManager.harmonizeTimestamps();
+          }
+
+          return JSON.stringify(report, null, 2);
+        } catch (error: any) {
+          dbLogger.error("❌ [MAINTENANCE] Error:", error.message);
+          return `Erreur maintenance: ${error.message}`;
         }
       },
     });

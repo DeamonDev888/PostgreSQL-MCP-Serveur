@@ -118,14 +118,14 @@ describe("CoreTools - B6 Limit Bug", () => {
   });
 });
 
-describe("CoreTools - 9 tools registered", () => {
-  it("registers exactly 9 core tools", async () => {
+describe("CoreTools - 10 tools registered", () => {
+  it("registers exactly 10 core tools", async () => {
     const { CoreTools } = await import("../src/tools/coreTools.js");
     const pool = createMockPool();
     const mockServer = { addTool: vi.fn() };
     const tools = new CoreTools(pool as any, mockServer as any);
     tools.registerTools();
 
-    expect(mockServer.addTool).toHaveBeenCalledTimes(9);
+    expect(mockServer.addTool).toHaveBeenCalledTimes(10);
   });
 });
