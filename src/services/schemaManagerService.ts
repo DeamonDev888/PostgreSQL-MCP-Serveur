@@ -25,7 +25,7 @@ export class SchemaManagerService {
       { table: "news", column: "timestamp" },
       { table: "verdict_execution_log", column: "timestamp" },
       { table: "semantic_context", column: "timestamp" },
-      { table: "semantic_context", column: "recorded_at" }
+      { table: "semantic_context", column: "recorded_at" },
     ];
 
     const results: SchemaFix[] = [];
@@ -34,14 +34,14 @@ export class SchemaManagerService {
       const fix: SchemaFix = {
         ...target,
         targetType: "TIMESTAMPTZ",
-        status: "PENDING"
+        status: "PENDING",
       };
 
       try {
         // 1. Vérifier si la table existe
         const tableCheck = await this.pool.query(
           "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)",
-          [target.table]
+          [target.table],
         );
 
         if (!tableCheck.rows[0].exists) {
@@ -54,7 +54,7 @@ export class SchemaManagerService {
         // 2. Vérifier le type actuel
         const typeCheck = await this.pool.query(
           "SELECT data_type FROM information_schema.columns WHERE table_name = $1 AND column_name = $2",
-          [target.table, target.column]
+          [target.table, target.column],
         );
 
         if (typeCheck.rows.length === 0) {
@@ -65,7 +65,10 @@ export class SchemaManagerService {
         }
 
         const currentType = typeCheck.rows[0].data_type.toUpperCase();
-        if (currentType === "TIMESTAMP WITH TIME ZONE" || currentType === "TIMESTAMPTZ") {
+        if (
+          currentType === "TIMESTAMP WITH TIME ZONE" ||
+          currentType === "TIMESTAMPTZ"
+        ) {
           fix.status = "FIXED"; // Déjà correct
           results.push(fix);
           continue;
@@ -75,7 +78,10 @@ export class SchemaManagerService {
         await this.applyTypeFix(target.table, target.column, "TIMESTAMPTZ");
         fix.status = "FIXED";
       } catch (err: any) {
-        Logger.error(`❌ Erreur fix ${target.table}.${target.column}:`, err.message);
+        Logger.error(
+          `❌ Erreur fix ${target.table}.${target.column}:`,
+          err.message,
+        );
         fix.status = "ERROR";
         fix.error = err.message;
       }
@@ -94,7 +100,8 @@ export class SchemaManagerService {
       await client.query("BEGIN");
 
       // 1. Trouver les vues dépendantes
-      const dependentViews = await client.query(`
+      const dependentViews = await client.query(
+        `
         SELECT DISTINCT dependent_view.relname as view_name, 
                pg_get_viewdef(dependent_view.oid) as view_def
         FROM pg_rewrite rw
@@ -103,7 +110,9 @@ export class SchemaManagerService {
         JOIN pg_class source_table ON d.refobjid = source_table.oid
         WHERE source_table.relname = $1
           AND dependent_view.relkind = 'v'
-      `, [table]);
+      `,
+        [table],
+      );
 
       // 2. Dropper les vues temporairement
       for (const view of dependentViews.rows) {
@@ -138,8 +147,8 @@ export class SchemaManagerService {
   /**
    * Vérifie l'intégrité globale du schéma pour les outils MCP
    */
-  async checkSchemaIntegrity(): Promise<{ 
-    valid: boolean; 
+  async checkSchemaIntegrity(): Promise<{
+    valid: boolean;
     issues: string[];
     details: any;
   }> {
@@ -151,7 +160,7 @@ export class SchemaManagerService {
     for (const table of essentialTables) {
       const res = await this.pool.query(
         "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)",
-        [table]
+        [table],
       );
       details[table] = { exists: res.rows[0].exists };
       if (!res.rows[0].exists) {
@@ -161,7 +170,7 @@ export class SchemaManagerService {
 
     // Vérifier extension pgvector
     const vectorCheck = await this.pool.query(
-      "SELECT 1 FROM pg_extension WHERE extname = 'vector'"
+      "SELECT 1 FROM pg_extension WHERE extname = 'vector'",
     );
     details.pgvector = { installed: vectorCheck.rows.length > 0 };
     if (vectorCheck.rows.length === 0) {
@@ -171,7 +180,7 @@ export class SchemaManagerService {
     return {
       valid: issues.length === 0,
       issues,
-      details
+      details,
     };
   }
 }

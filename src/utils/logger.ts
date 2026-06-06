@@ -20,12 +20,18 @@ const REDACT_PATHS = [
 
 const DEFAULT_LOG_DIR = path.join(process.cwd(), "logs");
 const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "nexus-postgresql.log");
-const GLOBAL_LOG_PATH = "C:\\SierraChart\\ACS_Source\\BTCacsil\\logs\\nexus-postgresql.log";
+const GLOBAL_LOG_PATH =
+  "C:\\SierraChart\\ACS_Source\\BTCacsil\\logs\\nexus-postgresql.log";
 
 function getFileTargets(): string[] {
   const raw = process.env.LOG_FILES ?? "";
-  const paths = raw.split(",").map(p => p.trim()).filter(Boolean);
-  const userPaths = paths.map(p => path.isAbsolute(p) ? p : path.resolve(process.cwd(), p));
+  const paths = raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const userPaths = paths.map((p) =>
+    path.isAbsolute(p) ? p : path.resolve(process.cwd(), p),
+  );
   return [DEFAULT_LOG_FILE, GLOBAL_LOG_PATH, ...userPaths];
 }
 
@@ -77,16 +83,18 @@ export const rootLogger = pino(
       version: "1.3.0",
     },
   },
-  transport
+  transport,
 );
 
 // Specialized Child Loggers
-export const dbLogger     = rootLogger.child({ module: "DATABASE" });
+export const dbLogger = rootLogger.child({ module: "DATABASE" });
 export const serverLogger = rootLogger.child({ module: "SERVER" });
-export const toolLogger   = rootLogger.child({ module: "TOOL" });
+export const toolLogger = rootLogger.child({ module: "TOOL" });
 export const vectorLogger = rootLogger.child({ module: "VECTOR" });
 
-rootLogger.info({ targets: fileTargets }, "Super-Pino V2.0 initialized for PostgreSQL-MCP");
+rootLogger.info(
+  { targets: fileTargets },
+  "Super-Pino V2.0 initialized for PostgreSQL-MCP",
+);
 
 export default rootLogger;
-
