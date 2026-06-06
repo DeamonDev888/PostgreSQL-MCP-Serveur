@@ -20,8 +20,6 @@ const REDACT_PATHS = [
 
 const DEFAULT_LOG_DIR = path.join(process.cwd(), "logs");
 const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "nexus-postgresql.log");
-const GLOBAL_LOG_PATH =
-  "C:\\SierraChart\\ACS_Source\\BTCacsil\\logs\\nexus-postgresql.log";
 
 function getFileTargets(): string[] {
   const raw = process.env.LOG_FILES ?? "";
@@ -32,7 +30,7 @@ function getFileTargets(): string[] {
   const userPaths = paths.map((p) =>
     path.isAbsolute(p) ? p : path.resolve(process.cwd(), p),
   );
-  return [DEFAULT_LOG_FILE, GLOBAL_LOG_PATH, ...userPaths];
+  return [DEFAULT_LOG_FILE, ...userPaths];
 }
 
 const fileTargets = getFileTargets();
