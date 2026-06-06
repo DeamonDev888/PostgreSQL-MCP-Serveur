@@ -1,9 +1,11 @@
 {
   "name": "overmind-postgres-mcp",
-  "version": "1.2.1",
+  "version": "1.4.1",
   "description": "A comprehensive MCP server for PostgreSQL database interaction",
   "main": "dist/index.js",
-  "bin": "./dist/index.js",
+  "bin": {
+    "overmind-postgres-mcp": "dist/index.js"
+  },
   "type": "module",
   "engines": {
     "node": ">=20 <25"
@@ -38,11 +40,13 @@
     "dist",
     "migrations",
     "assets",
-    "README.md"
+    "README.md",
+    "bin"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
+    "start:http": "FORCE_COLOR=0 FASTMCP_TRANSPORT=httpStream FASTMCP_PORT=5433 node dist/index.js",
     "dev": "node dist/index.js",
     "watch": "tsx watch src/index.ts",
     "check": "node -e \"dist/config.js && echo '✅ Configuration OK'\"",
@@ -52,7 +56,7 @@
     "clean": "node -e \"const fs=require('fs');const path=require('path');const distPath=path.join(process.cwd(),'dist');if(fs.existsSync(distPath)){try{fs.rmSync(distPath,{recursive:true,force:true});}catch(e){console.log('⚠️  dist cleanup skipped:',e.message);}}const files=fs.readdirSync('.').filter(f=>f.endsWith('.log'));files.forEach(f=>{try{fs.unlinkSync(f);}catch(e){console.log('⚠️  log cleanup skipped:',e.message);}});console.log('✅ Cleaned')\"",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
-    "prebuild": "npm run clean",
+    "prebuild": "npm run clean && copy /Y bin\\launch.js dist\\bin\\launch.js 2>nul || echo no bin",
     "postbuild": "echo ✅ Build completed successfully",
     "mcp:test": "node dist/index.js",
     "migrate:qwen3": "psql -U postgres -d financial_analyst -f migrations/migrate_to_qwen3_1024.sql",
@@ -76,28 +80,28 @@
   },
   "homepage": "https://discord.gg/4AR82phtBz",
   "dependencies": {
-    "axios": "^1.13.2",
-    "dotenv": "^16.3.1",
-    "fastmcp": "^3.35.0",
-    "pg": "^8.11.3",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "fastmcp": "^4.0.1",
+    "pg": "^8.20.0",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
     "pino-roll": "^2.2.0",
-    "zod": "^3.22.4"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "@types/node": "^20.10.0",
-    "@types/pg": "^8.10.9",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.19.19",
+    "@types/pg": "^8.20.0",
     "@types/pino": "^7.0.5",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
-    "eslint": "^8.0.0",
+    "eslint": "^9.18.0",
     "globals": "^17.1.0",
-    "prettier": "^3.0.0",
-    "tsx": "^4.6.0",
-    "typescript": "^5.3.0",
-    "typescript-eslint": "^8.53.1",
-    "vitest": "^4.1.5"
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^3.0.3"
   }
 }

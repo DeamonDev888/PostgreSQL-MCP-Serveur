@@ -1,12 +1,11 @@
-#!/usr/bin/env node
-
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { Pool } from "pg";
-import Logger from "../utils/logger.js";
+import { toolLogger, dbLogger } from "../utils/logger.js";
 import { IntelligentSearchService } from "../services/intelligentSearchService.js";
 import { embeddingService } from "../services/embeddingService.js";
 import { DBOptimizer } from "../utils/dbOptimizer.js";
+import { SchemaManagerService } from "../services/schemaManagerService.js";
 import {
   validateTableName,
   validateColumnName,
@@ -17,19 +16,21 @@ import {
 /**
  * Outils MCP Core - Refactorisation pour cohérence et simplicité
  *
- * 9 outils IMPLICITES et COHÉRENTS au lieu de 38 dispersés
+ * 10 outils IMPLICITES et COHÉRENTS au lieu de 38 dispersés
  */
 export class CoreTools {
   private pool: Pool;
   private server: FastMCP;
   private searchService: IntelligentSearchService;
   private optimizer: DBOptimizer;
+  private schemaManager: SchemaManagerService;
 
   constructor(pool: Pool, server: FastMCP) {
     this.pool = pool;
     this.server = server;
     this.searchService = new IntelligentSearchService(pool);
     this.optimizer = new DBOptimizer(pool);
+    this.schemaManager = new SchemaManagerService(pool);
   }
 
   registerTools(): void {
@@ -41,9 +42,10 @@ export class CoreTools {
     this.manageVectors();
     this.optimize();
     this.vectorize_row();
+    this.mcp_db_maintenance();
     this.help();
 
-    Logger.info("✅ Outils Core enregistrés (9 outils cohérents)");
+    toolLogger.info("✅ Outils Core enregistrés (10 outils cohérents)");
   }
 
   // ============================================================================
@@ -128,7 +130,10 @@ export class CoreTools {
 
           return "Diagnostic terminé";
         } catch (error: any) {
-          Logger.error("❌ [diagnose]", error.message);
+          toolLogger.error(
+            { err: error, tool: "diagnose" },
+            "Error in diagnose tool execution",
+          );
           return `❌ Erreur: ${error.message}`;
         } finally {
           client.release();
@@ -248,7 +253,10 @@ export class CoreTools {
               return "❌ Type d'exploration invalide";
           }
         } catch (error: any) {
-          Logger.error("❌ [explore]", error.message);
+          toolLogger.error(
+            { err: error, tool: "explore" },
+            "Error in explore tool execution",
+          );
           return `❌ Erreur: ${error.message}`;
         } finally {
           client.release();
@@ -414,7 +422,10 @@ MCP_PG_VECTOR({
             await client.release();
           }
         } catch (error: any) {
-          Logger.error("❌ [query]", error.message);
+          dbLogger.error(
+            { err: error, sql: args.sql },
+            "❌ [query] execution failed",
+          );
 
           // Messages d'erreur contextuels pour LLM
           const errorMsg = error.message.toLowerCase();
@@ -444,6 +455,22 @@ MCP_PG_VECTOR({
           } else if (errorMsg.includes("violates foreign key")) {
             guidance = `\n\n💡 **Guide LLM:** Contrainte de clé étrangère violée.\n`;
             guidance += `Vérifiez que l'ID référencé existe dans la table parent.`;
+          } else if (
+            error.code === "23505" &&
+            (error.constraint === "unique_single_open_position" ||
+              errorMsg.includes("unique_single_open_position"))
+          ) {
+            guidance = `\n\n💡 **Guide LLM:** Single Position Principle — une position OPEN existe déjà.\n`;
+            guidance += `Utilisez: SELECT * FROM positions WHERE status = 'OPEN' LIMIT 1\n`;
+            guidance += `Fermez ou gérez la position existante avant d'en ouvrir une nouvelle.`;
+            dbLogger.warn(
+              { constraint: error.constraint },
+              "⚠️ Single Position Principle triggered — position already OPEN",
+            );
+            return `⚠️ **Position déjà OUVERTE:** ${error.message}${guidance}`;
+          } else if (error.code === "23505") {
+            guidance = `\n\n💡 **Guide LLM:** Violation de contrainte d'unicité.\n`;
+            guidance += `Utilisez ON CONFLICT DO NOTHING ou ON CONFLICT (...) DO UPDATE pour gérer les doublons.`;
           }
 
           return `❌ **Erreur SQL:** ${error.message}${guidance}`;
@@ -536,7 +563,10 @@ MCP_PG_VECTOR({
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [search]", error.message);
+          toolLogger.error(
+            { err: error, tool: "search" },
+            "Error in search tool execution",
+          );
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -594,8 +624,9 @@ MCP_PG_VECTOR({
 
             const embeddingText =
               textParts.join(" | ") || JSON.stringify(args.data);
-            Logger.info(
-              `🔄 Génération embedding pour: "${embeddingText.substring(0, 50)}..."`,
+            dbLogger.info(
+              { text: embeddingText.substring(0, 50) + "..." },
+              "🔄 Génération embedding",
             );
 
             const embedding = await embeddingService.generateEmbedding(
@@ -624,7 +655,10 @@ MCP_PG_VECTOR({
             `${args.generateEmbedding ? "🧠 Embedding généré: " + args.dimensions + "D\n" : ""}`
           );
         } catch (error: any) {
-          Logger.error("❌ [insert]", error.message);
+          dbLogger.error(
+            { err: error, table: args.table },
+            "❌ [insert] execution failed",
+          );
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -725,7 +759,10 @@ MCP_PG_VECTOR({
               return "❌ Action invalide";
           }
         } catch (error: any) {
-          Logger.error("❌ [manage_vectors]", error.message);
+          dbLogger.error(
+            { err: error, tool: "manage_vectors", action: args.action },
+            "Error in manage_vectors execution",
+          );
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -810,7 +847,10 @@ MCP_PG_VECTOR({
 
           return output;
         } catch (error: any) {
-          Logger.error("❌ [optimize]", error.message);
+          toolLogger.error(
+            { err: error, tool: "optimize" },
+            "Error in optimize tool execution",
+          );
           return `❌ Erreur: ${error.message}`;
         }
       },
@@ -878,13 +918,22 @@ MCP_PG_VECTOR({
             client.release();
           }
         } catch (error: any) {
-          Logger.error("❌ [vectorize_row]", error.message);
+          dbLogger.error(
+            {
+              err: error,
+              tool: "vectorize_row",
+              table: args.table,
+              id: args.id,
+            },
+            "Error in vectorize_row execution",
+          );
           return `❌ Erreur: ${error.message}`;
         }
       },
     });
   }
 
+  // ============================================================================
   // ============================================================================
   // 9. HELP - Aide Contextuelle
   // ============================================================================
@@ -896,21 +945,23 @@ MCP_PG_VECTOR({
         topic: z
           .string()
           .optional()
-          .describe("Sujet spécifique (search, query, insert, etc.)"),
+          .describe("Sujet spécifique (search, MCP_PG_VECTOR, insert, etc.)"),
       }),
       execute: async (args) => {
         if (!args.topic) {
           return (
             `❓ **Aide - Outils MCP Core**\n\n` +
-            `🤖 **9 outils simples et cohérents:**\n\n` +
+            `🤖 **10 outils simples et cohérents:**\n\n` +
             `1. 🔍 **diagnose** - Diagnostic complet (connexion, performance)\n` +
             `2. 🗺️ **explore** - Explorer bases, tables, schémas\n` +
-            `3. ⚡ **query** - Exécuter des requêtes SQL\n` +
-            `4. 🔍 **search** - Recherche intelligente (auto-détection)\n` +
+            `3. ⚡ **MCP_PG_VECTOR** - Exécuter des requêtes SQL et Vector\n` +
+            `4. 🔍 **search** - Recherche sémantique / hybride intelligente\n` +
             `5. 📥 **insert** - Insérer données (avec/sans embedding)\n` +
             `6. 🧬 **manage_vectors** - Gestion vecteurs (création, index)\n` +
             `7. ⚡ **optimize** - Optimiser index, requêtes, tables\n` +
-            `8. ❓ **help** - Cette aide\n\n` +
+            `8. 🧠 **vectorize_row** - Générer un vecteur pour une ligne existante\n` +
+            `9. 🔧 **mcp_db_maintenance** - Tâches de maintenance et d'harmonisation de schéma\n` +
+            `10. ❓ **help** - Cette aide\n\n` +
             `💡 **Exemples:**\n` +
             `• help topic: "search" - Aide sur la recherche\n` +
             `• help topic: "insert" - Aide sur l'insertion\n`
@@ -965,19 +1016,19 @@ MCP_PG_VECTOR({
               `}`
             );
 
-          case "query":
+          case "mcp_pg_vector":
             return (
-              `⚡ **Aide - Requêtes SQL**\n\n` +
+              `⚡ **Aide - Requêtes SQL (MCP_PG_VECTOR)**\n\n` +
               `**Usage (lecture seule):**\n` +
               `{\n` +
-              `  "tool": "query",\n` +
+              `  "tool": "MCP_PG_VECTOR",\n` +
               `  "arguments": {\n` +
               `    "sql": "SELECT * FROM users LIMIT 10"\n` +
               `  }\n` +
               `}\n\n` +
               `**Avec modifications:**\n` +
               `{\n` +
-              `  "tool": "query",\n` +
+              `  "tool": "MCP_PG_VECTOR",\n` +
               `  "arguments": {\n` +
               `    "sql": "INSERT INTO users (name) VALUES ('John')",\n` +
               `    "readonly": false\n` +
@@ -1007,8 +1058,51 @@ MCP_PG_VECTOR({
             return (
               `❓ **Aide - ${args.topic}**\n\n` +
               `Utilisez "help" sans paramètre pour voir la liste des outils.\n` +
-              `Ou demandez: help topic: "search", "insert", "query", etc.`
+              `Ou demandez: help topic: "search", "insert", "MCP_PG_VECTOR", etc.`
             );
+        }
+      },
+    });
+  }
+
+  // ============================================================================
+  // 10. MCP_DB_MAINTENANCE - Tâches de Maintenance
+  // ============================================================================
+  private mcp_db_maintenance(): void {
+    this.server.addTool({
+      name: "mcp_db_maintenance",
+      description:
+        "🔧 Exécute les tâches de maintenance (harmonisation TIMESTAMPTZ, vérification intégrité)",
+      parameters: z.object({
+        action: z
+          .enum(["harmonize", "check", "full"])
+          .describe("Action à effectuer"),
+      }),
+      execute: async (args: { action: string }) => {
+        try {
+          const action = args.action as "harmonize" | "check" | "full";
+          dbLogger.info(`🔧 [MAINTENANCE] Execution action: ${action}`);
+
+          const report: any = {
+            timestamp: new Date().toISOString(),
+            action,
+            results: {},
+          };
+
+          if (action === "check" || action === "full") {
+            report.results.integrity =
+              await this.schemaManager.checkSchemaIntegrity();
+          }
+
+          if (action === "harmonize" || action === "full") {
+            report.results.harmonization =
+              await this.schemaManager.harmonizeTimestamps();
+          }
+
+          return JSON.stringify(report, null, 2);
+        } catch (error: any) {
+          dbLogger.error("❌ [MAINTENANCE] Error:", error.message);
+          return `Erreur maintenance: ${error.message}`;
         }
       },
     });

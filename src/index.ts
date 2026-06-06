@@ -7,9 +7,6 @@ import config, { dbConfig } from "./config.js";
 import { serverLogger, dbLogger, rootLogger } from "./utils/logger.js";
 
 import { CoreTools } from "./tools/coreTools.js";
-import { IntelligentSearchTools } from "./tools/intelligentSearch.js";
-import { PGVectorTools } from "./tools/pgvector.js";
-import { MaintenanceTools } from "./tools/maintenanceTools.js";
 import { DBOptimizer } from "./utils/dbOptimizer.js";
 
 // 🛡️ ULTIMATE SHIELD: Proxy process.stdout.write to redirect non-JSON data to stderr
@@ -35,12 +32,23 @@ process.stdout.write = function (
       try {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
-          serverLogger.warn({ raw: str }, "🛡️ [SHIELD] Blocked array-as-JSON-RPC on stdout");
-          return process.stderr.write(chunk, encoding as BufferEncoding, callback);
+          serverLogger.warn(
+            { raw: str },
+            "🛡️ [SHIELD] Blocked array-as-JSON-RPC on stdout",
+          );
+          return process.stderr.write(
+            chunk,
+            encoding as BufferEncoding,
+            callback,
+          );
         }
       } catch {
         // Not valid JSON, redirect to stderr
-        return process.stderr.write(chunk, encoding as BufferEncoding, callback);
+        return process.stderr.write(
+          chunk,
+          encoding as BufferEncoding,
+          callback,
+        );
       }
     }
     return originalStdoutWrite(chunk, encoding as BufferEncoding, callback);
@@ -76,28 +84,39 @@ console.error = (...args) => {
 
   // 🛡️ INTELLIGENT FILTER: Silence FastMCP transport noise (ZodError on shell argv leakage)
   // We use a more robust check here as ANSI codes or slight formatting changes can bypass simple includes
-  const isFastMCPError = typeof firstArg === "string" && (
-    firstArg.includes("[FastMCP error]") || 
-    firstArg.toLowerCase().includes("fastmcp")
-  );
+  const isFastMCPError =
+    typeof firstArg === "string" &&
+    (firstArg.includes("[FastMCP error]") ||
+      firstArg.toLowerCase().includes("fastmcp"));
 
   if (isFastMCPError && secondArg && typeof secondArg === "object") {
-    const isZodError = (secondArg as any).name === "ZodError" || (secondArg instanceof ZodError);
-    
+    const isZodError =
+      (secondArg as any).name === "ZodError" || secondArg instanceof ZodError;
+
     if (isZodError) {
       const errorMsg = (secondArg as any).message || "";
       // Check for the "array-sent-instead-of-object" signature (numeric keys "0", "1", "2"...)
       // This is typical transport noise from shell environments leaking into stdin
-      const hasNumericKeys = /"0"/.test(errorMsg) || /'0'/.test(errorMsg) || errorMsg.includes("unrecognized_keys");
-      const hasMethodIssue = errorMsg.includes("method") && errorMsg.includes("undefined");
+      const hasNumericKeys =
+        /"0"/.test(errorMsg) ||
+        /'0'/.test(errorMsg) ||
+        errorMsg.includes("unrecognized_keys");
+      const hasMethodIssue =
+        errorMsg.includes("method") && errorMsg.includes("undefined");
 
       if (hasNumericKeys && hasMethodIssue) {
-         serverLogger.debug({ transportNoise: true, zodError: secondArg }, "🛡️ [SHIELD] Filtered FastMCP transport noise (handshake ZodError)");
-         return;
+        serverLogger.debug(
+          { transportNoise: true, zodError: secondArg },
+          "🛡️ [SHIELD] Filtered FastMCP transport noise (handshake ZodError)",
+        );
+        return;
       }
-      
+
       // For other ZodErrors, log as WARN instead of ERROR to avoid triggering "system failure" alerts
-      serverLogger.warn({ zodError: secondArg, firstArg }, "⚠️ FastMCP Validation Warning");
+      serverLogger.warn(
+        { zodError: secondArg, firstArg },
+        "⚠️ FastMCP Validation Warning",
+      );
       return;
     }
   }
@@ -106,12 +125,14 @@ console.error = (...args) => {
   serverLogger.error({ consoleArgs: args }, "Captured console.error");
 };
 
-
 // 🚑 Emergency Recovery: Handle unhandled errors to log them before exiting
 process.on("uncaughtException", (error) => {
   // Handle ZodError specifically
   if (error instanceof ZodError) {
-    serverLogger.error({ err: formatZodError(error), validation: error.issues }, "🔍 ZOD VALIDATION ERROR - Invalid input received");
+    serverLogger.error(
+      { err: formatZodError(error), validation: error.issues },
+      "🔍 ZOD VALIDATION ERROR - Invalid input received",
+    );
     rootLogger.flush();
     // Don't exit for validation errors - just log them
     return;
@@ -124,13 +145,15 @@ process.on("uncaughtException", (error) => {
 process.on("unhandledRejection", (reason) => {
   // Handle ZodError in rejections
   if (reason instanceof ZodError) {
-    serverLogger.error({ err: formatZodError(reason), validation: reason.issues }, "🔍 ZOD VALIDATION ERROR (rejection)");
+    serverLogger.error(
+      { err: formatZodError(reason), validation: reason.issues },
+      "🔍 ZOD VALIDATION ERROR (rejection)",
+    );
     return;
   }
   serverLogger.error({ err: reason }, "🌊 UNHANDLED REJECTION");
   rootLogger.flush();
 });
-
 
 /**
  * Singleton MCP Server instance
@@ -168,7 +191,7 @@ export function getPool(): Pool {
       globalState.connectionCount--;
       dbLogger.debug(
         { connectionCount: globalState.connectionCount },
-        "📤 Connexion retirée du pool"
+        "📤 Connexion retirée du pool",
       );
     });
   }
@@ -218,7 +241,6 @@ export async function cleanup() {
   rootLogger.flush();
 }
 
-
 // Re-export core services for library usage
 export { CoreTools } from "./tools/coreTools.js";
 export { IntelligentSearchService } from "./services/intelligentSearchService.js";
@@ -229,7 +251,10 @@ export { default as config, dbConfig, postgresConfig } from "./config.js";
 // If this file is run directly, start the server
 async function runServer() {
   try {
-    serverLogger.debug({ cwd: process.cwd(), serviceDir: import.meta.url }, "🚀 [BOOT] Initializing PostgreSQL MCP Server");
+    serverLogger.debug(
+      { cwd: process.cwd(), serviceDir: import.meta.url },
+      "🚀 [BOOT] Initializing PostgreSQL MCP Server",
+    );
 
     const pool = getPool();
 
@@ -241,22 +266,29 @@ async function runServer() {
         const client = await pool.connect();
         const res = await client.query("SELECT 1 as health");
         client.release();
-        
+
         if (res.rows[0].health === 1) {
           isReady = true;
-          serverLogger.info("🐘 [BOOT] Database connection established and verified");
+          serverLogger.info(
+            "🐘 [BOOT] Database connection established and verified",
+          );
         }
       } catch (err: any) {
         retries--;
-        serverLogger.warn({ err: err.message, retriesLeft: retries }, "🐘 [BOOT] Database not ready yet, retrying...");
+        serverLogger.warn(
+          { err: err.message, retriesLeft: retries },
+          "🐘 [BOOT] Database not ready yet, retrying...",
+        );
         if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
     }
 
     if (!isReady) {
-      serverLogger.error("❌ [BOOT] Fatal: Could not connect to database after multiple retries.");
+      serverLogger.error(
+        "❌ [BOOT] Fatal: Could not connect to database after multiple retries.",
+      );
       // We still start the server but in "degraded" mode so agents can at least see why it's failing
     }
 
@@ -264,46 +296,62 @@ async function runServer() {
     const coreTools = new CoreTools(pool, server);
     coreTools.registerTools();
 
-    const searchTools = new IntelligentSearchTools(pool, server);
-    searchTools.registerTools();
-
-    const vectorTools = new PGVectorTools(pool, server);
-    vectorTools.registerTools();
-
-    const maintenanceTools = new MaintenanceTools(pool, server);
-    maintenanceTools.registerTools();
-
     // 3. Start the MCP server
-    await server.start();
-    serverLogger.info("✅ [BOOT] MCP Server started and listening for requests");
+    const port = parseInt(process.env.FASTMCP_PORT || "5433", 10);
+    const host = process.env.FASTMCP_HOST || "localhost";
+    const endpoint = process.env.FASTMCP_ENDPOINT || "/mcp";
+    await server.start({
+      transportType: "httpStream",
+      httpStream: {
+        port,
+        host,
+        endpoint: endpoint as `/${string}`,
+        stateless: true,
+      },
+    });
+    serverLogger.info(
+      `✅ [BOOT] MCP Server started on HTTP SSE ${host}:${port}${endpoint}`,
+    );
 
     // 4. Background Maintenance & Monitoring
     if (isReady) {
       // Periodic health audit
-      const auditInterval = setInterval(async () => {
-        try {
-          if (globalState.connectionCount > config.database.max * 0.8) {
-            serverLogger.warn(
-              { connectionCount: globalState.connectionCount, max: config.database.max },
-              "⚠️ [MONITOR] Pool saturation detected"
+      const auditInterval = setInterval(
+        async () => {
+          try {
+            if (globalState.connectionCount > config.database.max * 0.8) {
+              serverLogger.warn(
+                {
+                  connectionCount: globalState.connectionCount,
+                  max: config.database.max,
+                },
+                "⚠️ [MONITOR] Pool saturation detected",
+              );
+            }
+
+            // Background optimization check
+            const optimizer = new DBOptimizer(pool);
+            await optimizer.analyzeIndexUsage();
+          } catch (err: any) {
+            serverLogger.error(
+              { err: err.message },
+              "❌ [MONITOR] Background audit failed",
             );
           }
-          
-          // Background optimization check
-          const optimizer = new DBOptimizer(pool);
-          await optimizer.analyzeIndexUsage();
-        } catch (err: any) {
-          serverLogger.error({ err: err.message }, "❌ [MONITOR] Background audit failed");
-        }
-      }, 5 * 60 * 1000);
-      
+        },
+        5 * 60 * 1000,
+      );
+
       auditInterval.unref();
-      
+
       // Update global state for diagnostic tools
       updateGlobalState(true);
     }
   } catch (error: any) {
-    serverLogger.fatal({ err: error }, "❌ [BOOT] Fatal error during startup sequence");
+    serverLogger.fatal(
+      { err: error },
+      "❌ [BOOT] Fatal error during startup sequence",
+    );
     await cleanup();
     process.exit(1);
   }

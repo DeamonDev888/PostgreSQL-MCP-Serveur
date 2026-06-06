@@ -154,7 +154,7 @@ async function backfillEmbeddings() {
 
     Logger.info("✅ Backfill Complete!");
   } catch (err) {
-    Logger.error("❌ Fatal Script Error", err);
+    Logger.error({ err }, "❌ Fatal Script Error");
   } finally {
     await pool.end();
   }
