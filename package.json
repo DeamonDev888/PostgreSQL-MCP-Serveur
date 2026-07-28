@@ -1,6 +1,6 @@
 {
   "name": "overmind-postgres-mcp",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "A comprehensive MCP server for PostgreSQL database interaction",
   "main": "dist/index.js",
   "bin": {
@@ -49,15 +49,15 @@
     "start:http": "FORCE_COLOR=0 FASTMCP_TRANSPORT=httpStream FASTMCP_PORT=5433 node dist/index.js",
     "dev": "node dist/index.js",
     "watch": "tsx watch src/index.ts",
-    "check": "node -e \"dist/config.js && echo '✅ Configuration OK'\"",
+    "check": "node -e \"dist/config.js && echo '\u2705 Configuration OK'\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:qwen3": "node dist/scripts/test_qwen3_integration.js",
-    "clean": "node -e \"const fs=require('fs');const path=require('path');const distPath=path.join(process.cwd(),'dist');if(fs.existsSync(distPath)){try{fs.rmSync(distPath,{recursive:true,force:true});}catch(e){console.log('⚠️  dist cleanup skipped:',e.message);}}const files=fs.readdirSync('.').filter(f=>f.endsWith('.log'));files.forEach(f=>{try{fs.unlinkSync(f);}catch(e){console.log('⚠️  log cleanup skipped:',e.message);}});console.log('✅ Cleaned')\"",
+    "clean": "node -e \"const fs=require('fs');const path=require('path');const distPath=path.join(process.cwd(),'dist');if(fs.existsSync(distPath)){try{fs.rmSync(distPath,{recursive:true,force:true});}catch(e){console.log('\u26a0\ufe0f  dist cleanup skipped:',e.message);}}const files=fs.readdirSync('.').filter(f=>f.endsWith('.log'));files.forEach(f=>{try{fs.unlinkSync(f);}catch(e){console.log('\u26a0\ufe0f  log cleanup skipped:',e.message);}});console.log('\u2705 Cleaned')\"",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "prebuild": "npm run clean && copy /Y bin\\launch.js dist\\bin\\launch.js 2>nul || echo no bin",
-    "postbuild": "echo ✅ Build completed successfully",
+    "postbuild": "echo \u2705 Build completed successfully",
     "mcp:test": "node dist/index.js",
     "migrate:qwen3": "psql -U postgres -d financial_analyst -f migrations/migrate_to_qwen3_1024.sql",
     "prepublishOnly": "npm run build"

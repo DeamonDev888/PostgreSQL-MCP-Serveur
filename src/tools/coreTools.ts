@@ -13,6 +13,87 @@ import {
   validateDimensions,
 } from "../utils/sqlValidator.js";
 
+// =============================================================================
+// 🛣️ AGENT-TO-DATABASE ROUTING (PATCH 2026-07-27)
+// =============================================================================
+// Permet à un agent Veridy (ou autre) d'écrire dans sa DB métier (veridy)
+// plutôt que dans la DB de fallback configurée par défaut (overmind_core).
+//
+// Configuration via env var AGENT_DB_ROUTING (JSON):
+//   AGENT_DB_ROUTING='{"veridy_scorer_avocat":"veridy","autre_agent":"sa_db"}'
+//
+// Si non défini → fallback: pools créés avec les credentials par défaut.
+// Chaque agentName → 1 pool PG séparé (max=2, idle=5s) mis en cache.
+// =============================================================================
+function parseAgentRouting(): Record<string, string> {
+  const raw = process.env.AGENT_DB_ROUTING;
+  if (!raw || raw.trim() === "") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      // Valider que toutes les valeurs sont des strings
+      const clean: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === "string" && v.length > 0) {
+          clean[k] = v;
+        }
+      }
+      return clean;
+    }
+    console.error(
+      "⚠️ [ROUTING] AGENT_DB_ROUTING doit être un objet JSON {agent: db_name}",
+    );
+    return {};
+  } catch (err) {
+    console.error(
+      `⚠️ [ROUTING] AGENT_DB_ROUTING JSON invalide: ${(err as Error).message}`,
+    );
+    return {};
+  }
+}
+
+const AGENT_DB_ROUTING: Record<string, string> = parseAgentRouting();
+const AGENT_ROUTING_POOLS: Map<string, import("pg").Pool> = new Map();
+
+async function getRoutedPool(
+  agentName: string | undefined,
+  basePool: import("pg").Pool,
+): Promise<import("pg").Pool> {
+  if (!agentName || !(agentName in AGENT_DB_ROUTING)) {
+    return basePool; // fallback = pool par défaut
+  }
+  const targetDb = AGENT_DB_ROUTING[agentName];
+  const cached = AGENT_ROUTING_POOLS.get(targetDb);
+  if (cached) {
+    return cached;
+  }
+  // Créer un pool vers la DB cible avec les mêmes credentials que basePool
+  const pg = await import("pg");
+  const opts = basePool.options || {};
+  const newPool = new pg.Pool({
+    host: opts.host,
+    port: opts.port,
+    user: opts.user,
+    password: opts.password,
+    database: targetDb,
+    ssl: opts.ssl,
+    max: 2,
+    idleTimeoutMillis: 5000,
+  });
+  // Test rapide
+  const testClient = await newPool.connect();
+  await testClient.query("SELECT 1");
+  testClient.release();
+  AGENT_ROUTING_POOLS.set(targetDb, newPool);
+  dbLogger.info(
+    { agentName, targetDb, totalRoutedPools: AGENT_ROUTING_POOLS.size },
+    `🛣️ [ROUTING] agent "${agentName}" -> DB "${targetDb}" OK`,
+  );
+  return newPool;
+}
+
 /**
  * Outils MCP Core - Refactorisation pour cohérence et simplicité
  *
@@ -65,9 +146,14 @@ export class CoreTools {
           .boolean()
           .default(false)
           .describe("Diagnostic approfondi avec suggestions"),
+        agentName: z
+          .string()
+          .optional()
+          .describe("Nom de l'agent appelant (routing AGENT_DB_ROUTING)"),
       }),
       execute: async (args) => {
-        const client = await this.pool.connect();
+        const effectivePool = await getRoutedPool(args.agentName, this.pool);
+        const client = await effectivePool.connect();
         try {
           // 1. Diagnostic de connexion
           if (args.type === "connection" || args.type === "all") {
@@ -157,9 +243,14 @@ export class CoreTools {
           .describe("Type d'exploration"),
         target: z.string().optional().describe("Table ou schéma spécifique"),
         includeSize: z.boolean().default(false).describe("Inclure les tailles"),
+        agentName: z
+          .string()
+          .optional()
+          .describe("Nom de l'agent appelant (routing AGENT_DB_ROUTING)"),
       }),
       execute: async (args) => {
-        const client = await this.pool.connect();
+        const effectivePool = await getRoutedPool(args.agentName, this.pool);
+        const client = await effectivePool.connect();
         try {
           switch (args.type) {
             case "databases": {
@@ -294,6 +385,12 @@ MCP_PG_VECTOR({ sql: "INSERT INTO logs VALUES ('test')", readonly: false })
           .default(true)
           .describe("Mode lecture seule. FALSE = ÉCRITURE AUTORISÉE"),
         limit: z.number().default(100).describe("Limite de résultats"),
+        agentName: z
+          .string()
+          .optional()
+          .describe(
+            "Nom de l'agent appelant (utilisé pour router vers la bonne DB via AGENT_DB_ROUTING)",
+          ),
       }),
       execute: async (args) => {
         try {
@@ -364,7 +461,8 @@ MCP_PG_VECTOR({
             }
           }
 
-          const client = await this.pool.connect();
+          const effectivePool = await getRoutedPool(args.agentName, this.pool);
+          const client = await effectivePool.connect();
 
           try {
             // Nettoyer le SQL pour le wrapping: retirer ; final et commentaires de fin de ligne
@@ -592,11 +690,18 @@ MCP_PG_VECTOR({
           .number()
           .default(4096)
           .describe("Dimensions du vecteur (4096 pour Qwen)"),
+        agentName: z
+          .string()
+          .optional()
+          .describe(
+            "Nom de l'agent appelant (utilisé pour router vers la bonne DB via AGENT_DB_ROUTING)",
+          ),
       }),
       execute: async (args) => {
         try {
           const safeTable = validateTableName(args.table);
-          const client = await this.pool.connect();
+          const effectivePool = await getRoutedPool(args.agentName, this.pool);
+          const client = await effectivePool.connect();
 
           // Construire les colonnes et valeurs
           const columns: string[] = [];
@@ -683,13 +788,18 @@ MCP_PG_VECTOR({
           .number()
           .default(4096)
           .describe("Dimensions du vecteur (4096 pour Qwen)"),
+        agentName: z
+          .string()
+          .optional()
+          .describe("Nom de l'agent appelant (routing AGENT_DB_ROUTING)"),
       }),
       execute: async (args) => {
         try {
           const safeTable = validateTableName(args.table);
           const safeColumn = validateColumnName(args.column);
           validateDimensions(args.dimensions);
-          const client = await this.pool.connect();
+          const effectivePool = await getRoutedPool(args.agentName, this.pool);
+          const client = await effectivePool.connect();
 
           switch (args.action) {
             case "create": {
@@ -875,6 +985,10 @@ MCP_PG_VECTOR({
           .string()
           .default("embedding")
           .describe("Colonne cible pour le vecteur"),
+        agentName: z
+          .string()
+          .optional()
+          .describe("Nom de l'agent appelant (routing AGENT_DB_ROUTING)"),
       }),
       execute: async (args) => {
         try {
@@ -883,7 +997,8 @@ MCP_PG_VECTOR({
           const safeTextCols = args.text_columns.map((c) =>
             validateColumnName(c),
           );
-          const client = await this.pool.connect();
+          const effectivePool = await getRoutedPool(args.agentName, this.pool);
+          const client = await effectivePool.connect();
           try {
             // 1. Fetch content
             const cols = safeTextCols
